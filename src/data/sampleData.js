@@ -460,3 +460,27 @@ export const inventoryNavGroup = {
     { id: inventoryNavIds.components, label: 'Components (Class A)', shortLabel: 'Class A' },
   ],
 };
+export const orderBankData = [
+  { sku: 'FG-AERO-200', product: 'AeroCool Pro 200', inProcess: 12, inBank: 28, unitValue: 145000 },
+  { sku: 'FG-HVAC-88', product: 'ClimateLine 88', inProcess: 8, inBank: 19, unitValue: 162000 },
+  { sku: 'FG-PUMP-12', product: 'HydroMax 12', inProcess: 22, inBank: 41, unitValue: 98000 },
+  { sku: 'FG-MOTOR-7', product: 'SynDrive 7', inProcess: 15, inBank: 33, unitValue: 112000 },
+  { sku: 'FG-CTRL-301', product: 'LogicMaster 301', inProcess: 30, inBank: 55, unitValue: 78000 },
+  { sku: 'FG-FILTER-55', product: 'PureFlow 55', inProcess: 18, inBank: 47, unitValue: 85000 },
+  { sku: 'FG-SENSOR-9', product: 'SenseEdge 9', inProcess: 9, inBank: 22, unitValue: 134000 },
+];
+
+export const orderBankHistory = [
+  { month: 'Jan', y2026: 38, y2025: 32, y2024: 27, y2023: 24 },
+  { month: 'Feb', y2026: 42, y2025: 35, y2024: 30, y2023: 26 },
+  { month: 'Mar', y2026: 55, y2025: 44, y2024: 38, y2023: 31 },
+  { month: 'Apr', y2026: 61, y2025: 50, y2024: 42, y2023: 35 },
+  { month: 'May', y2026: null, y2025: 58, y2024: 47, y2023: 39 },
+  { month: 'Jun', y2026: null, y2025: 62, y2024: 51, y2023: 42 },
+  { month: 'Jul', y2026: null, y2025: 54, y2024: 46, y2023: 38 },
+  { month: 'Aug', y2026: null, y2025: 48, y2024: 41, y2023: 34 },
+  { month: 'Sep', y2026: null, y2025: 53, y2024: 45, y2023: 37 },
+  { month: 'Oct', y2026: null, y2025: 60, y2024: 49, y2023: 40 },
+  { month: 'Nov', y2026: null, y2025: 65, y2024: 54, y2023: 44 },
+  { month: 'Dec', y2026: null, y2025: 70, y2024: 58, y2023: 47 },
+];

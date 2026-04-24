@@ -6,8 +6,10 @@ import { SupplierModule } from './modules/SupplierModule';
 import { FulfillmentModule } from './modules/FulfillmentModule';
 import { DemandForecastModule } from './modules/DemandForecastModule';
 import { SupplyPlanningModule } from './modules/SupplyPlanningModule';
+import { OrderBankModule } from './modules/OrderBankModule';
 
 const views = {
+  orderBank: OrderBankModule,
   suppliers: SupplierModule,
   fulfillment: FulfillmentModule,
   demand: DemandForecastModule,
@@ -19,11 +21,12 @@ function isInventoryActive(id) {
 }
 
 function App() {
-  const [active, setActive] = useState(inventoryNavIds.fg);
+  const [active, setActive] = useState('orderbank');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(true);
 
   const ActiveView = useMemo(() => {
+    if (active === 'orderbank') return () => <OrderBankModule />;
     if (active === inventoryNavIds.fg) return () => <InventoryModule variant="fg" />;
     if (active === inventoryNavIds.components) return () => <InventoryModule variant="components" />;
     const Comp = views[active];
@@ -43,6 +46,15 @@ function App() {
           {!sidebarCollapsed && <span className="sidebar__title">SC Control</span>}
         </div>
         <nav className="sidebar__nav">
+        <button
+                type="button"
+                className={`nav-btn ${active === 'orderbank' ? 'nav-btn--active' : ''}`}
+                onClick={() => setActive('orderbank')}
+                title="Order Bank"
+              >
+                <span className="nav-btn__dot" aria-hidden />
+                <span className="nav-btn__text">{sidebarCollapsed ? 'Orders' : 'Order Bank'}</span>
+              </button>
           {!sidebarCollapsed ? (
             <div className="nav-group">
               <button
