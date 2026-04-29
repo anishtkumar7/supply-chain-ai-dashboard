@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { orderBankData, orderBankHistory } from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 export function OrderBankModule() {
+  const { skuData, setSkuData, orderHistory, markModuleDirty, MODULE_IDS } = useDashboardData();
   const [activeRow, setActiveRow] = useState(null);
+  const orderBankRows = skuData.map((sku) => ({
+    sku: sku.sku,
+    product: sku.product,
+    inBank: sku.ordersInBank,
+    inProcess: sku.ordersInProcess,
+    unitValue: sku.unitValue,
+  }));
 
-  const totalInBank = orderBankData.reduce((sum, r) => sum + r.inBank, 0);
-  const totalInProcess = orderBankData.reduce((sum, r) => sum + r.inProcess, 0);
-  const totalValue = orderBankData.reduce((sum, r) => sum + (r.inBank + r.inProcess) * r.unitValue, 0);
+  const totalInBank = orderBankRows.reduce((sum, r) => sum + r.inBank, 0);
+  const totalInProcess = orderBankRows.reduce((sum, r) => sum + r.inProcess, 0);
+  const totalValue = orderBankRows.reduce((sum, r) => sum + (r.inBank + r.inProcess) * r.unitValue, 0);
 
   return (
     <div style={{ padding: '24px', color: '#e2e8f0' }}>
@@ -20,7 +28,7 @@ export function OrderBankModule() {
         {[
           { label: 'Orders in Bank', value: totalInBank, color: '#3b82f6' },
           { label: 'Orders in Process', value: totalInProcess, color: '#10b981' },
-          { label: 'Total Order Value', value: '$' + (totalValue / 1e6).toFixed(1) + 'B', color: '#f59e0b' },
+          { label: 'Total Order Value', value: '$' + (totalValue / 1e6).toFixed(1) + 'M', color: '#f59e0b' },
         ].map((kpi) => (
           <div key={kpi.label} style={{
             background: '#1e293b', borderRadius: '10px', padding: '20px',
@@ -46,7 +54,7 @@ export function OrderBankModule() {
             </tr>
           </thead>
           <tbody>
-            {orderBankData.map((row) => (
+            {orderBankRows.map((row, idx) => (
               <tr
                 key={row.sku}
                 onClick={() => setActiveRow(activeRow === row.sku ? null : row.sku)}
@@ -59,7 +67,26 @@ export function OrderBankModule() {
               >
                 <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{row.sku}</td>
                 <td style={{ padding: '10px 12px', color: '#ffffff', fontWeight: '500' }}>{row.product}</td>
-                <td style={{ padding: '10px 12px', color: '#3b82f6', fontWeight: '600' }}>{row.inBank}</td>
+                <td
+                  style={{ padding: '10px 12px', color: '#3b82f6', fontWeight: '600' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {idx === 0 ? (
+                    <input
+                      type="number"
+                      min={0}
+                      value={row.inBank}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                        setSkuData((list) => list.map((s) => (s.sku === row.sku ? { ...s, ordersInBank: v } : s)));
+                        markModuleDirty(MODULE_IDS.orderbank);
+                      }}
+                      style={{ width: 72, background: '#0f172a', border: '1px solid #334155', color: '#3b82f6', borderRadius: 4, padding: 4 }}
+                    />
+                  ) : (
+                    row.inBank
+                  )}
+                </td>
                 <td style={{ padding: '10px 12px', color: '#10b981', fontWeight: '600' }}>{row.inProcess}</td>
                 <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>{row.inBank + row.inProcess}</td>
                 <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>${row.unitValue.toLocaleString()}</td>
@@ -78,7 +105,7 @@ export function OrderBankModule() {
           Monthly Order Volume — Year over Year Comparison
         </h3>
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={orderBankHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <LineChart data={orderHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis dataKey="month" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 12 }} />
             <YAxis stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 12 }} />

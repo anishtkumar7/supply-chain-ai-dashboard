@@ -11,12 +11,7 @@ import {
   ComposedChart,
   BarChart,
 } from 'recharts';
-import {
-  inventoryRows,
-  inventoryTrend,
-  classAComponents,
-  computeFgInventoryKpis,
-} from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 const axisStyle = { fill: '#94a3b8', fontSize: 11 };
 const gridStroke = '#1e3a5f';
@@ -28,11 +23,37 @@ function formatUsd(n) {
 }
 
 export function InventoryModule({ variant = 'fg' }) {
-  const kpis = computeFgInventoryKpis(inventoryRows);
+  const { skuData, setSkuData, componentData, setComponentData, orderHistory, markModuleDirty, MODULE_IDS } = useDashboardData();
+  const inventoryRows = skuData.map((sku) => ({
+    sku: sku.sku,
+    product: sku.product,
+    onHand: sku.onHand,
+    committed: sku.committed,
+    available: sku.available,
+    weeksCover: sku.wksCover,
+    status: sku.status,
+    grossMarginPct: sku.grossMargin,
+    unitCostUsd: sku.unitValue,
+  }));
 
-  const classAChartData = classAComponents.map((c) => ({
+  const kpis = {
+    totalSkus: inventoryRows.length,
+    skusAtRisk: inventoryRows.filter((r) => r.status === 'CRITICAL' || r.status === 'WATCH').length,
+    totalValueUsd: inventoryRows.reduce((sum, r) => sum + r.onHand * r.unitCostUsd, 0),
+  };
+
+  const inventoryTrend = orderHistory.slice(0, 8).map((row, idx) => ({
+    week: `W0${idx + 1}`,
+    fillRate: 96 + row.y2025 / 50,
+    stockoutEvents: Math.max(0, 8 - Math.round(row.y2025 / 10)),
+  }));
+
+  const classAChartData = componentData.map((c) => ({
     ...c,
-    extValue: c.onHand * c.unitCostUsd,
+    component: c.sku,
+    status: c.health,
+    extValue: c.extended,
+    unitCostUsd: c.unitCost,
   }));
 
   if (variant === 'components') {
@@ -73,7 +94,7 @@ export function InventoryModule({ variant = 'fg' }) {
           <ul className="fact-list">
             <li>
               <span className="fact-list__k">Class A SKUs</span>
-              <span className="fact-list__v">{classAComponents.length}</span>
+              <span className="fact-list__v">{componentData.length}</span>
             </li>
             <li>
               <span className="fact-list__k">On-hand extended</span>
@@ -84,7 +105,7 @@ export function InventoryModule({ variant = 'fg' }) {
             <li>
               <span className="fact-list__k">Critical / watch</span>
               <span className="fact-list__v">
-                {classAComponents.filter((c) => c.status !== 'Healthy').length} lanes
+                {componentData.filter((c) => c.health !== 'HEALTHY').length} lanes
               </span>
             </li>
           </ul>
@@ -111,20 +132,47 @@ export function InventoryModule({ variant = 'fg' }) {
                 </tr>
               </thead>
               <tbody>
-                {classAComponents.map((row) => {
-                  const ext = row.onHand * row.unitCostUsd;
+                {classAChartData.map((row, rowIdx) => {
+                  const ext = row.extValue;
                   return (
                     <tr key={row.component}>
                       <td className="mono">{row.component}</td>
                       <td>{row.description}</td>
-                      <td className="mono">{row.drivesFg}</td>
+                      <td className="mono">{row.drivesFG}</td>
                       <td>{row.supplier}</td>
-                      <td className="num">{row.onHand.toLocaleString()}</td>
+                      <td
+                        className="num"
+                        onClick={(e) => e.stopPropagation()}
+                        style={rowIdx === 0 ? { minWidth: 100 } : undefined}
+                      >
+                        {rowIdx === 0 ? (
+                          <input
+                            type="number"
+                            className="mono"
+                            value={row.onHand}
+                            min={0}
+                            onChange={(e) => {
+                              const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                              setComponentData((list) =>
+                                list.map((c) =>
+                                  c.sku === row.component
+                                    ? { ...c, onHand: v, extended: v * c.unitCost }
+                                    : c
+                                )
+                              );
+                              markModuleDirty(MODULE_IDS.inventoryComponents);
+                            }}
+                            style={{ width: 88, background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0' }}
+                          />
+                        ) : (
+                          row.onHand.toLocaleString()
+                        )}
+                      </td>
                       <td className="num">${row.unitCostUsd.toLocaleString()}</td>
                       <td className="num">{formatUsd(ext)}</td>
                       <td className="num">{row.daysSupply}</td>
                       <td>
-                        <span className={`pill pill--${row.status === 'Healthy' ? 'healthy' : row.status === 'Watch' ? 'watch' : 'critical'}`}>
+                        <span className={`pill pill--${row.status === 'HEALTHY' ? 'healthy' : row.status === 'WATCH' ? 'watch' : 'critical'}`}>
                           {row.status}
                         </span>
                       </td>
@@ -241,16 +289,41 @@ export function InventoryModule({ variant = 'fg' }) {
               </tr>
             </thead>
             <tbody>
-              {inventoryRows.map((row) => (
+              {inventoryRows.map((row, rowIdx) => (
                 <tr key={row.sku}>
                   <td className="mono">{row.sku}</td>
                   <td>{row.product}</td>
-                  <td className="num">{row.onHand.toLocaleString()}</td>
+                  <td className="num">
+                    {rowIdx === 0 ? (
+                      <input
+                        type="number"
+                        className="num"
+                        min={0}
+                        value={row.onHand}
+                        onChange={(e) => {
+                          const onHand = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                          setSkuData((list) =>
+                            list.map((s) => {
+                              if (s.sku !== row.sku) return s;
+                              const forecastWk = s.forecastNext90 ? s.forecastNext90 / 13 : 0;
+                              const wksCover = forecastWk ? onHand / forecastWk : 0;
+                              const available = Math.max(0, onHand - s.committed);
+                              return { ...s, onHand, wksCover, available };
+                            })
+                          );
+                          markModuleDirty(MODULE_IDS.inventoryFg);
+                        }}
+                        style={{ width: 80, background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0' }}
+                      />
+                    ) : (
+                      row.onHand.toLocaleString()
+                    )}
+                  </td>
                   <td className="num">{row.committed.toLocaleString()}</td>
                   <td className="num">{row.available.toLocaleString()}</td>
                   <td className="num">{row.weeksCover.toFixed(1)}</td>
                   <td>
-                    <span className={`pill pill--${row.status.toLowerCase()}`}>{row.status}</span>
+                    <span className={`pill pill--${row.status === 'HEALTHY' ? 'healthy' : row.status === 'WATCH' ? 'watch' : 'critical'}`}>{row.status}</span>
                   </td>
                   <td className={`num gross-margin ${row.grossMarginPct >= 35 ? 'gross-margin--strong' : ''}`}>
                     {row.grossMarginPct.toFixed(1)}%

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useElementSize } from '../hooks/useElementSize';
-import { buildShipmentArcs } from '../data/sampleData';
 
 const GLOBE_IMAGE = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
 
@@ -12,7 +11,21 @@ export function FulfillmentGlobe({ shipments, focusShipmentId, onArcIssueClick }
   const globeRef = useRef();
   const [globeReady, setGlobeReady] = useState(false);
 
-  const allArcs = useMemo(() => buildShipmentArcs(shipments), [shipments]);
+  const allArcs = useMemo(
+    () =>
+      shipments.map((s) => ({
+        shipmentId: s.id,
+        name: `${s.id}: ${s.origin} → ${s.destination}`,
+        startLat: s.lat1,
+        startLng: s.lng1,
+        endLat: s.lat2,
+        endLng: s.lng2,
+        color: s.status === 'ON TIME' ? '#22c55e' : s.status === 'DELAYED' ? '#eab308' : '#ef4444',
+        routeStatus: s.status.toLowerCase(),
+        delayReason: s.delayReason,
+      })),
+    [shipments]
+  );
 
   const arcsData = useMemo(() => {
     if (!focusShipmentId) return allArcs;
@@ -25,8 +38,8 @@ export function FulfillmentGlobe({ shipments, focusShipmentId, onArcIssueClick }
     if (focusShipmentId) {
       const s = shipments.find((x) => x.id === focusShipmentId);
       if (s) {
-        const lat = (s.startLat + s.endLat) / 2;
-        const lng = (s.startLng + s.endLng) / 2;
+        const lat = (s.lat1 + s.lat2) / 2;
+        const lng = (s.lng1 + s.lng2) / 2;
         g.pointOfView({ lat, lng, altitude: 1.12 }, 1400);
         return;
       }

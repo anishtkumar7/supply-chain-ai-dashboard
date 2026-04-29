@@ -10,12 +10,29 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { demandForecastSeries, skuDemandDetail } from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 const axisStyle = { fill: '#94a3b8', fontSize: 11 };
 const gridStroke = '#1e3a5f';
 
 export function DemandForecastModule() {
+  const { skuData } = useDashboardData();
+  const demandForecastSeries = [
+    { month: 'Jan', actual: 118000, forecast: 115000, confidenceLow: 108000, confidenceHigh: 122000 },
+    { month: 'Feb', actual: 122400, forecast: 120500, confidenceLow: 113000, confidenceHigh: 128000 },
+    { month: 'Mar', actual: 126800, forecast: 124200, confidenceLow: 117000, confidenceHigh: 131000 },
+    { month: 'Apr', actual: null, forecast: 128900, confidenceLow: 121000, confidenceHigh: 136000 },
+    { month: 'May', actual: null, forecast: 131200, confidenceLow: 123000, confidenceHigh: 139000 },
+    { month: 'Jun', actual: null, forecast: 133500, confidenceLow: 125000, confidenceHigh: 142000 },
+  ];
+  const skuDemandDetail = skuData.map((s) => ({
+    sku: s.sku,
+    family: s.family,
+    next90d: s.forecastNext90,
+    biasPct: s.forecastBias,
+    seasonality: s.seasonalityNote,
+  }));
+
   return (
     <div className="module-grid">
       <section className="panel panel--span2">

@@ -1,19 +1,46 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useElementSize } from '../hooks/useElementSize';
-import { buildSupplierArcs, buildSupplierPoints } from '../data/sampleData';
 
 const GLOBE_IMAGE = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
 
 const DEFAULT_POV = { lat: 22, lng: -35, altitude: 2.45 };
 
-export function SupplierGlobe({ suppliers, focusSupplierId, onArcIssueClick }) {
+export function SupplierGlobe({ suppliers, headquarters, focusSupplierId, onArcIssueClick }) {
   const { ref, width, height } = useElementSize();
   const globeRef = useRef();
   const [globeReady, setGlobeReady] = useState(false);
 
-  const allArcs = useMemo(() => buildSupplierArcs(suppliers), [suppliers]);
-  const allPoints = useMemo(() => buildSupplierPoints(suppliers), [suppliers]);
+  const allArcs = useMemo(
+    () =>
+      suppliers.map((s) => ({
+        supplierId: s.id,
+        name: `${s.name} → ${headquarters.city}`,
+        startLat: s.lat,
+        startLng: s.lng,
+        endLat: headquarters.lat,
+        endLng: headquarters.lng,
+        color: s.inboundStatus === 'ON TIME' ? '#22c55e' : s.inboundStatus === 'DELAYED' ? '#eab308' : '#ef4444',
+        inboundLaneStatus: s.inboundStatus.toLowerCase().replace(' ', '_'),
+        delayReason: s.inboundStatus === 'ON TIME' ? null : `${s.name} lane currently ${s.inboundStatus.toLowerCase()}.`,
+      })),
+    [suppliers, headquarters]
+  );
+  const allPoints = useMemo(
+    () => [
+      { id: 'HQ', name: `HQ — ${headquarters.city}`, lat: headquarters.lat, lng: headquarters.lng, color: '#fbbf24', altitude: 0.12, radius: 0.35 },
+      ...suppliers.map((s) => ({
+        id: s.id,
+        name: `${s.name} (${s.country})`,
+        lat: s.lat,
+        lng: s.lng,
+        color: s.inboundStatus === 'ON TIME' ? '#22c55e' : s.inboundStatus === 'DELAYED' ? '#eab308' : '#ef4444',
+        altitude: 0.06,
+        radius: 0.22,
+      })),
+    ],
+    [suppliers, headquarters]
+  );
 
   const arcsData = useMemo(() => {
     if (!focusSupplierId) return allArcs;

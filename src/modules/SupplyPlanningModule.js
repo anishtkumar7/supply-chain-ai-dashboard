@@ -8,7 +8,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { procurementTimeline, supplyPlanningRows } from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 const axisStyle = { fill: '#94a3b8', fontSize: 11 };
 const gridStroke = '#1e3a5f';
@@ -19,6 +19,27 @@ function isShortOnSupply(row) {
 }
 
 export function SupplyPlanningModule() {
+  const { componentData } = useDashboardData();
+  const procurementTimeline = [
+    { week: 'W09', plannedSpend: 420000, receipts: 380000 },
+    { week: 'W10', plannedSpend: 510000, receipts: 495000 },
+    { week: 'W11', plannedSpend: 465000, receipts: 450000 },
+    { week: 'W12', plannedSpend: 602000, receipts: 520000 },
+    { week: 'W13', plannedSpend: 488000, receipts: 500000 },
+    { week: 'W14', plannedSpend: 530000, receipts: 540000 },
+  ];
+  const supplyPlanningRows = componentData.map((row) => ({
+    component: row.sku,
+    parentSku: row.drivesFG,
+    moq: row.moq,
+    eoq: row.eoq,
+    onHand: row.onHand,
+    ldd: row.reorderDate,
+    netNeed: row.netNeed,
+    reorderDate: row.reorderDate,
+    supplier: row.supplier,
+  }));
+
   return (
     <div className="module-grid">
       <section className="panel panel--span3">

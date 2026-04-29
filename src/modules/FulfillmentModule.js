@@ -1,15 +1,16 @@
 import { useState, useCallback } from 'react';
 import { FulfillmentGlobe } from '../components/FulfillmentGlobe';
 import { DelayDetailModal } from '../components/DelayDetailModal';
-import { activeShipments } from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 function routePillClass(status) {
-  if (status === 'on_time') return 'lane lane--on';
-  if (status === 'delayed') return 'lane lane--late';
+  if (status === 'on_time' || status === 'at_sea' || status === 'in_transit') return 'lane lane--on';
+  if (status === 'delayed' || status === 'transshipment') return 'lane lane--late';
   return 'lane lane--stuck';
 }
 
 export function FulfillmentModule() {
+  const { shipmentData } = useDashboardData();
   const [focusShipmentId, setFocusShipmentId] = useState(null);
   const [delayModal, setDelayModal] = useState(null);
 
@@ -46,7 +47,7 @@ export function FulfillmentModule() {
             </button>
           )}
           <FulfillmentGlobe
-            shipments={activeShipments}
+            shipments={shipmentData}
             focusShipmentId={focusShipmentId}
             onArcIssueClick={onArcIssueClick}
           />
@@ -56,7 +57,7 @@ export function FulfillmentModule() {
       <section className="panel panel--span3">
         <div className="panel__head">
           <h2>In-transit detail</h2>
-          <span className="panel__meta">{activeShipments.length} active shipments</span>
+          <span className="panel__meta">{shipmentData.length} active shipments</span>
         </div>
         <div className="table-scroll">
           <table className="data-table data-table--click">
@@ -74,7 +75,7 @@ export function FulfillmentModule() {
               </tr>
             </thead>
             <tbody>
-              {activeShipments.map((s) => (
+              {shipmentData.map((s) => (
                 <tr
                   key={s.id}
                   className={focusShipmentId === s.id ? 'data-table__row--active' : undefined}
@@ -91,13 +92,13 @@ export function FulfillmentModule() {
                   <td className="mono">{s.id}</td>
                   <td className="mono">{s.sku}</td>
                   <td>{s.origin}</td>
-                  <td>{s.dest}</td>
+                  <td>{s.destination}</td>
                   <td>{s.mode}</td>
                   <td>{s.carrier}</td>
                   <td className="num">{s.etaDays}</td>
                   <td>
-                    <span className={routePillClass(s.routeStatus)}>
-                      {s.routeStatus === 'on_time' ? 'On time' : s.routeStatus === 'delayed' ? 'Delayed' : 'Stuck'}
+                    <span className={routePillClass(s.routeStatus.toLowerCase().replace(' ', '_'))}>
+                      {s.status === 'ON TIME' ? 'On time' : s.status === 'DELAYED' ? 'Delayed' : 'Stuck'}
                     </span>
                   </td>
                   <td>

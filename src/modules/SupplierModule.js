@@ -1,7 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
 import { SupplierGlobe } from '../components/SupplierGlobe';
 import { DelayDetailModal } from '../components/DelayDetailModal';
-import { headquarters, suppliers } from '../data/sampleData';
+import { useDashboardData } from '../context/DashboardDataContext';
+
+const headquarters = { city: 'Chicago, IL', lat: 41.88, lng: -87.63 };
 
 function lanePillClass(status) {
   if (status === 'on_time') return 'lane lane--on';
@@ -10,6 +12,7 @@ function lanePillClass(status) {
 }
 
 export function SupplierModule() {
+  const { supplierData } = useDashboardData();
   const [focusSupplierId, setFocusSupplierId] = useState(null);
   const [search, setSearch] = useState('');
   const [delayModal, setDelayModal] = useState(null);
@@ -17,14 +20,14 @@ export function SupplierModule() {
   const searchTrim = search.trim().toLowerCase();
   const searchMatches = useMemo(() => {
     if (!searchTrim) return [];
-    return suppliers.filter(
+    return supplierData.filter(
       (s) =>
         s.id.toLowerCase().includes(searchTrim) ||
         s.name.toLowerCase().includes(searchTrim) ||
         s.country.toLowerCase().includes(searchTrim) ||
         s.category.toLowerCase().includes(searchTrim)
     );
-  }, [searchTrim]);
+  }, [searchTrim, supplierData]);
 
   const clearFocus = useCallback(() => setFocusSupplierId(null), []);
 
@@ -102,7 +105,7 @@ export function SupplierModule() {
               ×
             </button>
           )}
-          <SupplierGlobe suppliers={suppliers} focusSupplierId={focusSupplierId} onArcIssueClick={onArcIssueClick} />
+          <SupplierGlobe suppliers={supplierData} headquarters={headquarters} focusSupplierId={focusSupplierId} onArcIssueClick={onArcIssueClick} />
         </div>
       </section>
 
@@ -127,7 +130,7 @@ export function SupplierModule() {
               </tr>
             </thead>
             <tbody>
-              {suppliers.map((s) => (
+              {supplierData.map((s) => (
                 <tr
                   key={s.id}
                   className={focusSupplierId === s.id ? 'data-table__row--active' : undefined}
@@ -145,17 +148,17 @@ export function SupplierModule() {
                   <td>{s.name}</td>
                   <td>{s.country}</td>
                   <td>{s.category}</td>
-                  <td className="num">{s.leadTimeDays}</td>
-                  <td className="num">{s.onTimePct.toFixed(1)}</td>
-                  <td className="num">${(s.spendYtdUsd / 1000).toFixed(0)}k</td>
+                  <td className="num">{s.leadDays}</td>
+                  <td className="num">{s.otifPct.toFixed(1)}</td>
+                  <td className="num">${(s.spendUSD / 1000).toFixed(0)}k</td>
                   <td>
-                    <span className={lanePillClass(s.inboundLaneStatus)}>
-                      {s.inboundLaneStatus === 'on_time' ? 'On time' : s.inboundLaneStatus === 'delayed' ? 'Delayed' : 'Stuck'}
+                    <span className={lanePillClass(s.inboundStatus.toLowerCase().replace(' ', '_'))}>
+                      {s.inboundStatus === 'ON TIME' ? 'On time' : s.inboundStatus === 'DELAYED' ? 'Delayed' : 'Stuck'}
                     </span>
                   </td>
                   <td>
-                    <span className={`pill pill--${s.riskScore === 'Low' ? 'healthy' : s.riskScore === 'Medium' ? 'watch' : 'critical'}`}>
-                      {s.riskScore}
+                    <span className={`pill pill--${s.risk === 'LOW' ? 'healthy' : s.risk === 'MEDIUM' ? 'watch' : 'critical'}`}>
+                      {s.risk}
                     </span>
                   </td>
                 </tr>
