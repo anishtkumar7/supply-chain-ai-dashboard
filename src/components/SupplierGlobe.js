@@ -20,7 +20,12 @@ export function SupplierGlobe({ suppliers, headquarters, focusSupplierId, onArcI
         startLng: s.lng,
         endLat: headquarters.lat,
         endLng: headquarters.lng,
-        color: s.inboundStatus === 'ON TIME' ? '#22c55e' : s.inboundStatus === 'DELAYED' ? '#eab308' : '#ef4444',
+        color:
+          String(s.inboundStatus).toUpperCase() === 'ON TIME'
+            ? '#22c55e'
+            : String(s.inboundStatus).toUpperCase() === 'DELAYED'
+              ? '#eab308'
+              : '#ef4444',
         inboundLaneStatus: s.inboundStatus.toLowerCase().replace(' ', '_'),
         delayReason: s.inboundStatus === 'ON TIME' ? null : `${s.name} lane currently ${s.inboundStatus.toLowerCase()}.`,
       })),
@@ -34,7 +39,12 @@ export function SupplierGlobe({ suppliers, headquarters, focusSupplierId, onArcI
         name: `${s.name} (${s.country})`,
         lat: s.lat,
         lng: s.lng,
-        color: s.inboundStatus === 'ON TIME' ? '#22c55e' : s.inboundStatus === 'DELAYED' ? '#eab308' : '#ef4444',
+        color:
+          String(s.inboundStatus).toUpperCase() === 'ON TIME'
+            ? '#22c55e'
+            : String(s.inboundStatus).toUpperCase() === 'DELAYED'
+              ? '#eab308'
+              : '#ef4444',
         altitude: 0.06,
         radius: 0.22,
       })),

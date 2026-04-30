@@ -251,6 +251,27 @@ export function exportForActiveView(active, data, format) {
       return exportSheet(fgRows(data.skuData), 'inventory-finished-goods', format);
     case 'inventory-components':
       return exportSheet(componentRows(data.componentData), 'inventory-components', format);
+    case 'inventory-parts': {
+      const partsRows = [
+        ...data.skuData.map((s) => ({
+          Type: 'FG',
+          SKU: s.sku,
+          Description: s.product,
+          Family: s.family,
+          'On Hand': s.onHand,
+          Committed: s.committed,
+          Available: s.available,
+        })),
+        ...data.componentData.map((c) => ({
+          Type: 'Component',
+          SKU: c.sku,
+          Description: c.description,
+          'Drives FG': c.drivesFG,
+          'On Hand': c.onHand,
+        })),
+      ];
+      return exportSheet(partsRows, 'parts-inventory-lookup', format);
+    }
     case 'suppliers':
       return exportSheet(supplierRows(data.supplierData), 'suppliers', format);
     case 'trade-risk':
@@ -261,6 +282,11 @@ export function exportForActiveView(active, data, format) {
       return exportSheet(forecastRows(data.skuData), 'demand-forecast', format);
     case 'planning':
       return exportSheet(componentRows(data.componentData), 'supply-planning', format);
+    case 'purchase-orders':
+      return exportSheet(componentRows(data.componentData), 'purchase-orders-components', format);
+    case 'production-planning':
+    case 'shop-floor':
+      return exportAllDataV2(data, format);
     case 'agents':
       return exportSheet(agentExportRows(data.agentAlerts), 'ai-agent-alerts', format);
     default:

@@ -9,10 +9,22 @@ function routePillClass(status) {
   return 'lane lane--stuck';
 }
 
-export function FulfillmentModule() {
+const CARRIER_CONTACTS = {
+  Maersk: { email: 'ops@maersk.example.com', phone: '+1-312-555-2001' },
+  'Hapag-Lloyd': { email: 'ops@hapaglloyd.example.com', phone: '+49-40-555-2002' },
+  ONE: { email: 'ops@one.example.com', phone: '+81-3-555-2003' },
+  MSC: { email: 'ops@msc.example.com', phone: '+41-22-555-2004' },
+  'CMA CGM': { email: 'ops@cmacgm.example.com', phone: '+33-4-555-2005' },
+  'J.B. Hunt': { email: 'ops@jbhunt.example.com', phone: '+1-479-555-2006' },
+  'CN Rail': { email: 'ops@cnrail.example.com', phone: '+1-514-555-2007' },
+};
+
+export function FulfillmentModule({ onComposeEmail }) {
   const { shipmentData } = useDashboardData();
   const [focusShipmentId, setFocusShipmentId] = useState(null);
   const [delayModal, setDelayModal] = useState(null);
+  const [phoneModal, setPhoneModal] = useState(null);
+  const [contactShipmentId, setContactShipmentId] = useState(null);
 
   const clearFocus = useCallback(() => setFocusShipmentId(null), []);
   const onArcIssueClick = useCallback((payload) => setDelayModal(payload), []);
@@ -72,6 +84,7 @@ export function FulfillmentModule() {
                 <th className="num">ETA (d)</th>
                 <th>Route</th>
                 <th>Status</th>
+                <th>Contact</th>
               </tr>
             </thead>
             <tbody>
@@ -104,6 +117,89 @@ export function FulfillmentModule() {
                   <td>
                     <span className="pill pill--route">{s.status}</span>
                   </td>
+                  <td>
+                    <div className="icon-action-row">
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title={`Show phone ${CARRIER_CONTACTS[s.carrier]?.phone || 'carrier ops'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhoneModal({
+                            label: s.carrier,
+                            phone: CARRIER_CONTACTS[s.carrier]?.phone || 'No phone listed',
+                          });
+                        }}
+                        aria-label="Show carrier phone number"
+                      >
+                        📞
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title="Email carrier"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onComposeEmail({
+                            recipientName: s.carrier,
+                            recipientEmail: CARRIER_CONTACTS[s.carrier]?.email || `${s.carrier.toLowerCase().replace(/[^a-z0-9]+/g, '')}@carrier.example.com`,
+                            subject: `Shipment ${s.id} Follow Up — ${s.carrier}`,
+                            body: `Hello ${s.carrier} team,\n\nPlease provide a status update for shipment ${s.id} (${s.sku}) from ${s.origin} to ${s.destination}. Current dashboard status: ${s.status} / ${s.routeStatus}.\nPrimary phone contact: ${CARRIER_CONTACTS[s.carrier]?.phone || 'N/A'}.\n\nThank you,\nVectrum Logistics`,
+                          });
+                        }}
+                        aria-label="Email carrier"
+                      >
+                        ✉️
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        title={CARRIER_CONTACTS[s.carrier]?.phone || 'No direct phone listed'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setContactShipmentId((id) => (id === s.id ? null : s.id));
+                        }}
+                      >
+                        Contact Carrier
+                      </button>
+                    </div>
+                    {contactShipmentId === s.id && (
+                      <div className="contact-pop">
+                        <div className="contact-pop__title">{s.carrier}</div>
+                        <div className="contact-pop__meta">{CARRIER_CONTACTS[s.carrier]?.phone || 'No phone listed'}</div>
+                        <div className="po-inline-actions">
+                          <button
+                            type="button"
+                            className="btn btn--green"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onComposeEmail({
+                                recipientName: s.carrier,
+                                recipientEmail: CARRIER_CONTACTS[s.carrier]?.email || `${s.carrier.toLowerCase().replace(/[^a-z0-9]+/g, '')}@carrier.example.com`,
+                                subject: `Shipment ${s.id} Follow Up — ${s.carrier}`,
+                                body: `Hello ${s.carrier} team,\n\nPlease provide a status update for shipment ${s.id} (${s.sku}) from ${s.origin} to ${s.destination}. Current dashboard status: ${s.status} / ${s.routeStatus}.\nPrimary phone contact: ${CARRIER_CONTACTS[s.carrier]?.phone || 'N/A'}.\n\nThank you,\nVectrum Logistics`,
+                              });
+                            }}
+                          >
+                            Send Email
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPhoneModal({
+                                label: s.carrier,
+                                phone: CARRIER_CONTACTS[s.carrier]?.phone || 'No phone listed',
+                              });
+                            }}
+                          >
+                            Phone Number
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -118,6 +214,20 @@ export function FulfillmentModule() {
         status={delayModal?.status}
         reason={delayModal?.reason}
       />
+      {phoneModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Phone number">
+          <div className="modal-card" style={{ maxWidth: 380 }}>
+            <div className="modal-card__head">
+              <h3>Phone Number</h3>
+              <button type="button" className="modal-card__close" onClick={() => setPhoneModal(null)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <p className="modal-card__sub">{phoneModal.label}</p>
+            <p className="modal-card__body mono">{phoneModal.phone}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

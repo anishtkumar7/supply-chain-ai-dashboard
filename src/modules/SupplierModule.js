@@ -11,11 +11,13 @@ function lanePillClass(status) {
   return 'lane lane--stuck';
 }
 
-export function SupplierModule() {
+export function SupplierModule({ onComposeEmail }) {
   const { supplierData } = useDashboardData();
   const [focusSupplierId, setFocusSupplierId] = useState(null);
   const [search, setSearch] = useState('');
   const [delayModal, setDelayModal] = useState(null);
+  const [contactSupplierId, setContactSupplierId] = useState(null);
+  const [phoneModal, setPhoneModal] = useState(null);
 
   const searchTrim = search.trim().toLowerCase();
   const searchMatches = useMemo(() => {
@@ -127,6 +129,7 @@ export function SupplierModule() {
                 <th className="num">Spend USD</th>
                 <th>Inbound</th>
                 <th>Risk</th>
+                <th>Contact</th>
               </tr>
             </thead>
             <tbody>
@@ -161,6 +164,90 @@ export function SupplierModule() {
                       {s.risk}
                     </span>
                   </td>
+                  <td>
+                    <div className="icon-action-row">
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title={`Show phone ${s.primaryContact?.phone || 'contact'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhoneModal({
+                            label: s.name,
+                            phone: s.primaryContact?.phone || 'No phone listed',
+                          });
+                        }}
+                        aria-label="Show supplier phone number"
+                      >
+                        📞
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title="Email supplier"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!s.primaryContact) return;
+                          onComposeEmail({
+                            recipientName: s.primaryContact.name,
+                            recipientEmail: s.primaryContact.email,
+                            subject: `Vectrum Manufacturing — Supplier Follow Up — ${s.name}`,
+                            body: `Dear ${s.primaryContact.name},\n\nI am reaching out regarding our current open orders and supply status. Please find our current PO details below and confirm your delivery schedule at your earliest convenience.\n\nPO-2026-0036, PO-2026-0037, PO-2026-0038, PO-2026-0039, PO-2026-0040, PO-2026-0041\n\nRegards,\nVectrum Manufacturing`,
+                          });
+                        }}
+                        aria-label="Email supplier"
+                      >
+                        ✉️
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setContactSupplierId((id) => (id === s.id ? null : s.id));
+                        }}
+                      >
+                        Contact
+                      </button>
+                    </div>
+                    {contactSupplierId === s.id && s.primaryContact && (
+                      <div className="contact-pop">
+                        <div className="contact-pop__title">{s.primaryContact.name}</div>
+                        <div className="contact-pop__meta">{s.primaryContact.email} · {s.primaryContact.phone}</div>
+                        <div className="po-inline-actions">
+                          <button
+                            type="button"
+                            className="btn btn--green"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onComposeEmail({
+                                recipientName: s.primaryContact.name,
+                                recipientEmail: s.primaryContact.email,
+                                subject: `Vectrum Manufacturing — Supplier Follow Up — ${s.name}`,
+                                body: `Dear ${s.primaryContact.name},\n\nI am reaching out regarding our current open orders and supply status. Please find our current PO details below and confirm your delivery schedule at your earliest convenience.\n\nPO-2026-0036, PO-2026-0037, PO-2026-0038, PO-2026-0039, PO-2026-0040, PO-2026-0041\n\nRegards,\nVectrum Manufacturing`,
+                              });
+                            }}
+                          >
+                            Email Supplier
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPhoneModal({
+                                label: s.name,
+                                phone: s.primaryContact.phone,
+                              });
+                            }}
+                          >
+                            Call
+                          </button>
+                          <a className="btn btn--ghost" href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
+                        </div>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -175,6 +262,20 @@ export function SupplierModule() {
         status={delayModal?.status}
         reason={delayModal?.reason}
       />
+      {phoneModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Phone number">
+          <div className="modal-card" style={{ maxWidth: 380 }}>
+            <div className="modal-card__head">
+              <h3>Phone Number</h3>
+              <button type="button" className="modal-card__close" onClick={() => setPhoneModal(null)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <p className="modal-card__sub">{phoneModal.label}</p>
+            <p className="modal-card__body mono">{phoneModal.phone}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

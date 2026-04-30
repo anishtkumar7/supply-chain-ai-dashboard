@@ -20,14 +20,15 @@ function severityPillClass(severity) {
   return 'pill pill--healthy';
 }
 
-export function AIAgentsModule() {
-  const { skuData, shipmentData, supplierData, componentData, customerOrderData } = useDashboardData();
+export function AIAgentsModule({ onComposeEmail }) {
+  const { skuData, shipmentData, supplierData, componentData, customerOrderData, contactDirectory } = useDashboardData();
   const [nowMs, setNowMs] = useState(Date.now());
   const [dismissed, setDismissed] = useState({});
   const [actions, setActions] = useState({});
   const [openMenuId, setOpenMenuId] = useState(null);
   const [toast, setToast] = useState(null);
   const [plannerEscalations, setPlannerEscalations] = useState([]);
+  const [internalContactModal, setInternalContactModal] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 30000);
@@ -193,6 +194,22 @@ export function AIAgentsModule() {
     ];
   }, [nowMs, plannerEscalations, skuData, shipmentData, supplierData, componentData, customerOrderData]);
 
+  const plannerContact = contactDirectory.find((c) => /supply planner/i.test(c.role));
+  const buyerContact = contactDirectory.find((c) => /buyer/i.test(c.role));
+
+  function isSupplierAlert(agentId) {
+    return agentId === 'supplier-risk-agent' || agentId === 'fulfillment-agent';
+  }
+
+  function openDeepLink(type, contact) {
+    if (!contact) return;
+    if (type === 'teams') {
+      window.open(`msteams://l/chat/0/0?users=${encodeURIComponent(contact.teamsHandle)}`, '_blank');
+    } else {
+      window.open(`slack://user?team=vectrum&id=${encodeURIComponent(contact.slackHandle)}`, '_blank');
+    }
+  }
+
   return (
     <div className="module-grid">
       {agents.map((agent) => {
@@ -234,6 +251,34 @@ export function AIAgentsModule() {
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 12, position: 'relative' }}>
+              {agent.alert && isSupplierAlert(agent.id) && (
+                <button
+                  type="button"
+                  className="nav-btn"
+                  onClick={() => {
+                    const supplier = supplierData.find((s) => s.risk === 'HIGH') || supplierData[0];
+                    if (!supplier?.primaryContact) return;
+                    onComposeEmail({
+                      recipientName: supplier.primaryContact.name,
+                      recipientEmail: supplier.primaryContact.email,
+                      subject: `Supplier Alert Follow Up — ${supplier.name}`,
+                      body: `Dear ${supplier.primaryContact.name},\n\nOur AI alert requires attention:\n${agent.alert}\n\nPlease provide status and recovery actions for open commitments.\n\nRegards,\nVectrum Supply Chain`,
+                    });
+                  }}
+                >
+                  Contact Supplier
+                </button>
+              )}
+              {agent.alert && !isSupplierAlert(agent.id) && (
+                <>
+                  <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: plannerContact, agent })}>
+                    Contact Planner
+                  </button>
+                  <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: buyerContact, agent })}>
+                    Contact Buyer
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className="nav-btn"
@@ -304,6 +349,38 @@ export function AIAgentsModule() {
           }}
         >
           {toast}
+        </div>
+      )}
+      {internalContactModal?.contact && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Internal contact">
+          <div className="modal-card">
+            <div className="modal-card__head">
+              <h3>{internalContactModal.contact.name}</h3>
+              <button type="button" className="modal-card__close" onClick={() => setInternalContactModal(null)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <p className="modal-card__sub">{internalContactModal.contact.role}</p>
+            <p className="modal-card__body">{internalContactModal.contact.email}</p>
+            <div className="po-inline-actions">
+              <button
+                type="button"
+                className="btn btn--green"
+                onClick={() =>
+                  onComposeEmail({
+                    recipientName: internalContactModal.contact.name,
+                    recipientEmail: internalContactModal.contact.email,
+                    subject: `${internalContactModal.agent.module} alert follow-up`,
+                    body: `Hi ${internalContactModal.contact.name},\n\nPlease review the following alert:\n${internalContactModal.agent.alert}\n\nThanks,\nVectrum Control Tower`,
+                  })
+                }
+              >
+                Email
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => openDeepLink('teams', internalContactModal.contact)}>Teams</button>
+              <button type="button" className="btn btn--ghost" onClick={() => openDeepLink('slack', internalContactModal.contact)}>Slack</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

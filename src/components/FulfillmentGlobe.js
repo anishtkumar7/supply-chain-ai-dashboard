@@ -20,7 +20,12 @@ export function FulfillmentGlobe({ shipments, focusShipmentId, onArcIssueClick }
         startLng: s.lng1,
         endLat: s.lat2,
         endLng: s.lng2,
-        color: s.status === 'ON TIME' ? '#22c55e' : s.status === 'DELAYED' ? '#eab308' : '#ef4444',
+        color:
+          String(s.status).toUpperCase() === 'ON TIME'
+            ? '#22c55e'
+            : String(s.status).toUpperCase() === 'DELAYED'
+              ? '#eab308'
+              : '#ef4444',
         routeStatus: s.status.toLowerCase(),
         delayReason: s.delayReason,
       })),

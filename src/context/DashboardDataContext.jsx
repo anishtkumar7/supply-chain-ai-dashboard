@@ -13,6 +13,7 @@ import {
   orderHistory as initOrderHistory,
   customerOrderData as initCustomerOrder,
   agentAlerts as initAgentAlerts,
+  contactDirectory as initContactDirectory,
 } from '../data/sampleData';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -25,6 +26,7 @@ export const MODULE_IDS = {
   customerOrders: 'customer-orders',
   inventoryFg: 'inventory-fg',
   inventoryComponents: 'inventory-components',
+  inventoryParts: 'inventory-parts',
   suppliers: 'suppliers',
   tradeRisk: 'trade-risk',
   fulfillment: 'fulfillment',
@@ -32,6 +34,8 @@ export const MODULE_IDS = {
   planning: 'planning',
   agents: 'agents',
   dataSync: 'data-sync',
+  receiving: 'receiving',
+  shopFloor: 'shop-floor',
 };
 
 export function DashboardDataProvider({ children }) {
@@ -42,6 +46,7 @@ export function DashboardDataProvider({ children }) {
   const [orderHistory, setOrderHistory] = useState(() => clone(initOrderHistory));
   const [customerOrderData, setCustomerOrderData] = useState(() => clone(initCustomerOrder));
   const [agentAlerts, setAgentAlerts] = useState(() => clone(initAgentAlerts));
+  const [contactDirectory] = useState(() => clone(initContactDirectory));
   const [dirtyModules, setDirtyModules] = useState(() => new Set());
   const [lastManualUpload, setLastManualUpload] = useState({
     message: 'Using sample data',
@@ -142,6 +147,7 @@ export function DashboardDataProvider({ children }) {
       setCustomerOrderData,
       agentAlerts,
       setAgentAlerts,
+      contactDirectory,
       markModuleDirty,
       clearModuleDirty,
       saveAllChanges,
@@ -161,6 +167,7 @@ export function DashboardDataProvider({ children }) {
       orderHistory,
       customerOrderData,
       agentAlerts,
+      contactDirectory,
       markModuleDirty,
       clearModuleDirty,
       saveAllChanges,

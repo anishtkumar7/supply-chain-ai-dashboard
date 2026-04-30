@@ -8,9 +8,11 @@ export function useElementSize() {
     const el = ref.current;
     if (!el) return;
     const { width, height } = el.getBoundingClientRect();
-    setSize({
-      width: Math.max(280, Math.floor(width)),
-      height: Math.max(300, Math.floor(height)),
+    const nextWidth = Math.max(280, Math.floor(width));
+    const nextHeight = Math.max(300, Math.floor(height));
+    setSize((prev) => {
+      if (prev.width === nextWidth && prev.height === nextHeight) return prev;
+      return { width: nextWidth, height: nextHeight };
     });
   }, []);
 

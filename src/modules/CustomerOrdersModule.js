@@ -22,7 +22,7 @@ function atpStatusClass(status) {
   return 'pill pill--critical';
 }
 
-export function CustomerOrdersModule() {
+export function CustomerOrdersModule({ onComposeEmail }) {
   const { customerOrderData, skuData } = useDashboardData();
   const [activeOrder, setActiveOrder] = useState(null);
   const [plannerEscalations, setPlannerEscalations] = useState([]);
@@ -111,6 +111,7 @@ export function CustomerOrdersModule() {
                 <th>ATP status</th>
                 <th>Reason</th>
                 <th>Action</th>
+                <th>Contact Customer</th>
               </tr>
             </thead>
             <tbody>
@@ -128,6 +129,22 @@ export function CustomerOrdersModule() {
                   <td>
                     <button type="button" className="nav-btn nav-btn--active" onClick={() => setActiveOrder(o.id)}>
                       Take Action
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() =>
+                        onComposeEmail({
+                          recipientName: o.customer,
+                          recipientEmail: `${o.customer.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@customer.example.com`,
+                          subject: `Your Order ${o.id} — Status Update from Vectrum Manufacturing`,
+                          body: `Dear ${o.customer},\n\nWe wanted to provide you with an update on your order for ${o.product} ${o.qtyOrdered} units.\n\nStatus: ${o.atpStatus}. ${o.reason}.\n\nPlease do not hesitate to reach out with any questions.\n\nRegards,\nVectrum Manufacturing`,
+                        })
+                      }
+                    >
+                      Contact Customer
                     </button>
                   </td>
                 </tr>
