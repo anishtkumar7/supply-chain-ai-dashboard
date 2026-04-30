@@ -348,6 +348,12 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
   const showDemandSection = access.allowedIds.has('demand');
   const showToolsSection = ['agents', CONTACTS_ID, 'data-sync'].some((id) => access.allowedIds.has(id));
 
+  useEffect(() => {
+    if (!access.allowedIds.has(active)) {
+      setActive(defaultActive);
+    }
+  }, [access.allowedIds, active, defaultActive]);
+
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--collapsed' : ''}`}>
       <aside className="sidebar" aria-label="Primary">

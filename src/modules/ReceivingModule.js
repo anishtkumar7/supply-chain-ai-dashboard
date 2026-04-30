@@ -24,7 +24,7 @@ function fmtDate(date) {
 }
 
 export function ReceivingModule({ loggedInName, onComposeEmail }) {
-  const { shipmentData, setShipmentData, componentData, setComponentData, supplierData } = useDashboardData();
+  const { shipmentData, setShipmentData, setComponentData, supplierData } = useDashboardData();
   const [queue, setQueue] = useState(INBOUND_QUEUE);
   const [history, setHistory] = useState(INITIAL_HISTORY);
   const [receiptModal, setReceiptModal] = useState(null);
