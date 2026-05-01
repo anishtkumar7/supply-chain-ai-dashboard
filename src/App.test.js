@@ -8,7 +8,8 @@ jest.mock('react-globe.gl', () => ({
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders dashboard title', () => {
+test('renders RIVIT login branding', () => {
   render(<App />);
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Supply Chain Dashboard');
+  expect(screen.getByRole('img', { name: /RIVIT Manufacturing/i })).toBeInTheDocument();
+  expect(screen.getByText(/Connect every role in your manufacturing operation/i)).toBeInTheDocument();
 });

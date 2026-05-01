@@ -23,7 +23,7 @@ import {
   exportSheet,
 } from '../utils/exportUtils';
 
-const SERVICE_ACCOUNT = 'vectrum-sync@sc-control.iam.gserviceaccount.com';
+const SERVICE_ACCOUNT = 'vectrum-sync@rivit.iam.gserviceaccount.com';
 
 const BANNER_STYLE = {
   background: 'linear-gradient(90deg, rgba(250, 204, 21, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%)',
@@ -49,15 +49,17 @@ const greyPill = {
   border: '1px solid #475569',
 };
 
+const erpLogoUrl = (file) => `${process.env.PUBLIC_URL || ''}/erp-logos/${file}`;
+
 const ERP_SYSTEMS = [
-  { id: 'sap', name: 'SAP S/4HANA', desc: 'Enterprise ERP sync', available: true },
-  { id: 'netsuite', name: 'Oracle NetSuite', desc: 'Cloud ERP connector', available: true },
-  { id: 'd365', name: 'Microsoft Dynamics 365', desc: 'Full SCM integration', available: true },
-  { id: 'infor', name: 'Infor CloudSuite', desc: 'Manufacturing ERP', available: true },
-  { id: 'epicor', name: 'Epicor Kinetic', desc: 'Discrete manufacturing', available: true },
-  { id: 'qb', name: 'QuickBooks Manufacturing', desc: 'SMB accounting sync', available: false },
-  { id: 'sage', name: 'Sage X3', desc: 'Mid-market ERP', available: false },
-  { id: 'jobboss', name: 'JobBOSS²', desc: 'Job shop ERP', available: false },
+  { id: 'sap', name: 'SAP S/4HANA', desc: 'Enterprise ERP sync', available: true, logo: 'sap.svg' },
+  { id: 'netsuite', name: 'Oracle NetSuite', desc: 'Cloud ERP connector', available: true, logo: 'netsuite.svg' },
+  { id: 'd365', name: 'Microsoft Dynamics 365', desc: 'Full SCM integration', available: true, logo: 'd365.svg' },
+  { id: 'infor', name: 'Infor CloudSuite', desc: 'Manufacturing ERP', available: true, logo: 'infor.svg' },
+  { id: 'epicor', name: 'Epicor Kinetic', desc: 'Discrete manufacturing', available: true, logo: 'epicor.svg' },
+  { id: 'qb', name: 'QuickBooks Manufacturing', desc: 'SMB accounting sync', available: false, logo: 'quickbooks.svg' },
+  { id: 'sage', name: 'Sage X3', desc: 'Mid-market ERP', available: false, logo: 'sage.svg' },
+  { id: 'jobboss', name: 'JobBOSS²', desc: 'Job shop ERP', available: false, logo: 'jobboss.svg' },
 ];
 
 const ZONES = [
@@ -72,7 +74,7 @@ const ZONES = [
       'On Hand',
       'Committed',
       'Available',
-      'Weeks Cover',
+      'Days Cover',
       'Status',
       'Gross Margin',
     ],
@@ -155,7 +157,7 @@ function buildVectrumTemplate(zone) {
         'On Hand',
         'Committed',
         'Available',
-        'Weeks Cover',
+        'Days Cover',
         'Status',
         'Gross Margin',
       ];
@@ -641,8 +643,8 @@ export function DataSyncModule() {
       <p className="panel__meta" style={{ marginBottom: 16 }}>Integration hub for ERP, MRP, CRM, Sheets, and file uploads</p>
 
       <div style={BANNER_STYLE}>
-        <strong>Sample data notice:</strong> Currently showing sample data for Vectrum Manufacturing. Upload your Excel
-        or CSV data, connect Google Sheets, or integrate your ERP system to see your real operations in real time.
+        <strong>Sample data notice:</strong> Currently showing sample data for Vectrum Manufacturing. Upload your data or
+        connect your ERP to see your real operations in RIVIT.
       </div>
 
       <section className="panel" style={{ marginBottom: 20 }}>
@@ -775,7 +777,28 @@ export function DataSyncModule() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 12 }}>
           {ERP_SYSTEMS.map((e) => (
             <div key={e.id} style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 10, padding: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 8, background: '#1e3a5f', marginBottom: 8, display: 'grid', placeItems: 'center' }}>◇</div>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 8,
+                  background: '#f8fafc',
+                  marginBottom: 8,
+                  display: 'grid',
+                  placeItems: 'center',
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={erpLogoUrl(e.logo)}
+                  alt={`${e.name} logo`}
+                  width={30}
+                  height={30}
+                  style={{ objectFit: 'contain', display: 'block' }}
+                  loading="lazy"
+                />
+              </div>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{e.name}</div>
               <p className="panel__meta" style={{ margin: '4px 0' }}>{e.desc}</p>
               <span className={e.available ? 'pill pill--healthy' : 'pill pill--route'}>{e.available ? 'AVAILABLE' : 'COMING SOON'}</span>

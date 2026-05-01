@@ -1,0 +1,240 @@
+/**
+ * Print / PDF layouts — light theme only when printing.
+ * Screen: hide .vectrum-print-root. Print: hide .print-exec-skip (sidebar + chrome).
+ */
+
+.vectrum-print-root,
+.print-exec-report {
+  display: none !important;
+}
+
+@media print {
+  @page {
+    margin: 14mm 12mm 22mm 12mm;
+    @bottom-center {
+      content: 'Page ' counter(page) ' of ' counter(pages) ' — RIVIT Manufacturing Operations Intelligence Platform — Confidential';
+      font-size: 8pt;
+      color: #4b5563;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+  }
+
+  html,
+  body,
+  .app-root,
+  .app-fade {
+    background: #fff !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .app-fade {
+    display: block !important;
+    min-height: 0 !important;
+    animation: none !important;
+  }
+
+  .print-exec-skip {
+    display: none !important;
+  }
+
+  .vectrum-print-root,
+  .print-exec-report {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .vectrum-print-root *,
+  .print-exec-report * {
+    color: #111827 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .exec-pdf {
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.45;
+    color: #111827 !important;
+    background: #fff !important;
+    max-width: 100%;
+    padding-bottom: 6mm;
+  }
+
+  .exec-pdf__masthead {
+    border-bottom: 2pt solid #0f172a;
+    padding-bottom: 10pt;
+    margin-bottom: 12pt;
+    background: #fff !important;
+  }
+
+  .exec-pdf__title {
+    margin: 0 0 6pt;
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0f172a !important;
+    background: #fff !important;
+  }
+
+  .exec-pdf__subtitle {
+    margin: 0 0 10pt;
+    font-size: 11pt;
+    font-weight: 600;
+    color: #374151 !important;
+    background: #fff !important;
+  }
+
+  .exec-pdf__meta-grid {
+    display: grid;
+    gap: 4pt 16pt;
+    font-size: 9.5pt;
+    color: #4b5563 !important;
+    background: #fff !important;
+  }
+
+  .exec-pdf__meta-grid p {
+    margin: 0;
+    background: #fff !important;
+  }
+
+  .exec-pdf__section {
+    margin-bottom: 12pt;
+    break-inside: auto;
+    page-break-inside: auto;
+    background: #fff !important;
+  }
+
+  .exec-pdf__section--last {
+    margin-bottom: 6pt;
+  }
+
+  .exec-pdf__section--inventory {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .exec-pdf__section-title {
+    margin: 0 0 8pt;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #0f172a !important;
+    border-left: 3pt solid #1d4ed8;
+    padding-left: 8pt;
+    background: #fff !important;
+  }
+
+  .exec-pdf__lede {
+    margin: 0 0 8pt;
+    font-size: 9.5pt;
+    color: #4b5563 !important;
+    background: #fff !important;
+  }
+
+  .exec-pdf__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    border: 0.75pt solid #d1d5db;
+    background: #fff !important;
+  }
+
+  .exec-pdf__table th,
+  .exec-pdf__table td {
+    border: 0.5pt solid #e5e7eb;
+    padding: 5pt 7pt;
+    text-align: left;
+    vertical-align: top;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .exec-pdf__table thead th {
+    background: #f3f4f6 !important;
+    font-weight: 600;
+    color: #111827 !important;
+  }
+
+  .exec-pdf__table tbody tr:nth-child(even) td {
+    background: #fafafa !important;
+  }
+
+  .exec-pdf__table--dense td,
+  .exec-pdf__table--dense th {
+    padding: 3.5pt 6pt;
+  }
+
+  .exec-pdf__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .exec-pdf__mono {
+    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 9pt;
+  }
+
+  .exec-pdf__alert-ul {
+    margin: 0;
+    padding-left: 14pt;
+    list-style: disc;
+    color: #111827 !important;
+  }
+
+  .exec-pdf__alert-ul li {
+    margin-bottom: 8pt;
+  }
+
+  .exec-pdf__alert-sev {
+    display: inline-block;
+    min-width: 52pt;
+    font-weight: 700;
+    font-size: 8.5pt;
+    color: #1e3a8a !important;
+  }
+
+  .exec-pdf__alert-mod {
+    display: inline-block;
+    margin-right: 6pt;
+    font-weight: 600;
+    color: #374151 !important;
+  }
+
+  .exec-pdf__alert-text {
+    display: block;
+    margin-top: 2pt;
+    color: #111827 !important;
+  }
+
+  /* Body footer: confidentiality only (page # via @page where supported) */
+  .exec-pdf__footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 5pt 10mm;
+    border-top: 0.5pt solid #d1d5db;
+    background: #fff !important;
+    font-size: 8.5pt;
+    color: #6b7280 !important;
+    text-align: center;
+  }
+
+  .exec-pdf__footer--compact {
+    padding: 4pt 10mm;
+  }
+
+  .exec-pdf__footer-line {
+    margin: 0;
+    font-weight: 600;
+    color: #374151 !important;
+  }
+}

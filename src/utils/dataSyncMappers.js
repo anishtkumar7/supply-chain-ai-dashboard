@@ -1,4 +1,5 @@
 import { toNum, toStr } from './dataSyncParse';
+import { fgInventoryStatusFromWksCover } from './coverageDisplay';
 
 function pick(row, keys) {
   for (const k of keys) {
@@ -12,6 +13,10 @@ export function mapRowsToSkuData(mappedRows, previous) {
   return mappedRows.map((r) => {
     const sku = toStr(pick(r, ['SKU', 'sku']));
     const prev = bySku.get(sku) || {};
+    const daysCol = pick(r, ['Days Cover', 'DaysCover', 'daysCover']);
+    const wksCol = pick(r, ['Weeks Cover', 'WeeksCover', 'wksCover']);
+    const wksCover =
+      daysCol != null && daysCol !== '' ? toNum(daysCol) / 7 : toNum(wksCol);
     return {
       sku,
       product: toStr(pick(r, ['Product', 'product']) ?? prev.product),
@@ -20,8 +25,8 @@ export function mapRowsToSkuData(mappedRows, previous) {
       onHand: toNum(pick(r, ['On Hand', 'OnHand', 'onHand'])),
       committed: toNum(pick(r, ['Committed', 'committed'])),
       available: toNum(pick(r, ['Available', 'available'])),
-      wksCover: toNum(pick(r, ['Weeks Cover', 'WeeksCover', 'wksCover'])),
-      status: toStr(pick(r, ['Status', 'status']) || 'HEALTHY'),
+      wksCover,
+      status: toStr(pick(r, ['Status', 'status']) || fgInventoryStatusFromWksCover(wksCover)),
       grossMargin: toNum(pick(r, ['Gross Margin', 'GrossMargin', 'grossMargin'])),
       ordersInBank: prev.ordersInBank ?? 0,
       ordersInProcess: prev.ordersInProcess ?? 0,

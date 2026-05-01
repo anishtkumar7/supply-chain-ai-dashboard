@@ -12,6 +12,9 @@ import {
   Cell,
 } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useExportRegistration } from '../context/ExportRegistrationContext';
+import { PURCHASE_ORDERS_ID } from '../config/roleNavConfig';
+import { purchaseOrderTrackerRows } from '../utils/exportUtils';
 
 const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const SHORT_CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
@@ -192,6 +195,9 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
   const [openPos, setOpenPos] = useState(INITIAL_POS);
   const [toast, setToast] = useState('');
   const [viewModalPo, setViewModalPo] = useState(null);
+  const [poTrackerSearch, setPoTrackerSearch] = useState('');
+  const [poStatusFilter, setPoStatusFilter] = useState('All');
+  const [poSupplierFilter, setPoSupplierFilter] = useState('All');
 
   const nextPoNumber = useMemo(() => {
     const maxSeq = openPos.reduce((max, po) => {
@@ -270,6 +276,52 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
       }),
     [openPos, today]
   );
+
+  const trackerSuppliers = useMemo(() => {
+    const set = new Set();
+    normalizedRows.forEach((po) => set.add(po.supplier));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [normalizedRows]);
+
+  const poTrackerQ = poTrackerSearch.trim().toLowerCase();
+  const filteredTrackerRows = useMemo(() => {
+    return normalizedRows.filter((po) => {
+      if (poStatusFilter !== 'All' && po.status !== poStatusFilter) return false;
+      if (poSupplierFilter !== 'All' && po.supplier !== poSupplierFilter) return false;
+      if (!poTrackerQ) return true;
+      const desc = componentBySku.get(po.componentSku)?.description || '';
+      const hay = `${po.poNumber} ${po.componentSku} ${desc} ${po.supplier}`.toLowerCase();
+      return hay.includes(poTrackerQ);
+    });
+  }, [componentBySku, normalizedRows, poStatusFilter, poSupplierFilter, poTrackerQ]);
+
+  const clearPoTrackerFilters = () => {
+    setPoTrackerSearch('');
+    setPoStatusFilter('All');
+    setPoSupplierFilter('All');
+  };
+
+  const poExportFilterNote = useMemo(() => {
+    const parts = [];
+    if (poTrackerSearch.trim()) parts.push(`search="${poTrackerSearch.trim()}"`);
+    if (poStatusFilter !== 'All') parts.push(`status=${poStatusFilter}`);
+    if (poSupplierFilter !== 'All') parts.push(`supplier=${poSupplierFilter}`);
+    return parts.length ? parts.join('; ') : null;
+  }, [poTrackerSearch, poStatusFilter, poSupplierFilter]);
+
+  const poExportRows = useMemo(
+    () => purchaseOrderTrackerRows(filteredTrackerRows, componentBySku),
+    [filteredTrackerRows, componentBySku]
+  );
+
+  useExportRegistration(PURCHASE_ORDERS_ID, () => ({
+    rows: poExportRows,
+    filterNote: poExportFilterNote,
+    pdfModel: {
+      rows: poExportRows,
+      filterLine: poExportFilterNote || 'None',
+    },
+  }));
 
   const stats = useMemo(() => {
     const openRows = normalizedRows.filter((po) => ['DRAFT', 'SUBMITTED'].includes(po.status));
@@ -540,16 +592,60 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
 
       <section className="panel panel--span3">
         <div className="panel__head"><h2>Open Purchase Orders</h2></div>
+        <div className="table-filters">
+          <div className="table-filters__row">
+            <input
+              type="search"
+              className="globe-search"
+              placeholder="Search by PO number, component, or supplier…"
+              value={poTrackerSearch}
+              onChange={(e) => setPoTrackerSearch(e.target.value)}
+              autoComplete="off"
+            />
+            <select
+              className="table-filters__select"
+              value={poStatusFilter}
+              onChange={(e) => setPoStatusFilter(e.target.value)}
+              aria-label="Filter by PO status"
+            >
+              <option value="All">All</option>
+              <option value="DRAFT">Draft</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="OVERDUE">Overdue</option>
+            </select>
+            <select
+              className="table-filters__select"
+              value={poSupplierFilter}
+              onChange={(e) => setPoSupplierFilter(e.target.value)}
+              aria-label="Filter by supplier"
+            >
+              <option value="All">All</option>
+              {trackerSuppliers.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <button type="button" className="btn btn--ghost" onClick={clearPoTrackerFilters}>
+              Clear Filters
+            </button>
+          </div>
+          <p className="table-filters__count">
+            Showing {filteredTrackerRows.length} of {normalizedRows.length} results
+          </p>
+        </div>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr><th>PO Number</th><th>Component</th><th>Supplier</th><th>Qty</th><th>PO Value</th><th>Required By</th><th>Status</th><th>Supplier Acknowledgment</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {normalizedRows.map((po) => (
+              {filteredTrackerRows.map((po) => (
                 <tr key={po.poNumber}>
                   <td>{po.poNumber}</td>
-                  <td>{po.componentSku}</td>
+                  <td>
+                    <div>{po.componentSku}</div>
+                    <small>{componentBySku.get(po.componentSku)?.description || ''}</small>
+                  </td>
                   <td>{po.supplier}</td>
                   <td>{po.qty.toLocaleString()}</td>
                   <td>{SHORT_CURRENCY.format(po.poValue)}</td>
@@ -566,6 +662,9 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
                   </td>
                 </tr>
               ))}
+              {filteredTrackerRows.length === 0 && (
+                <tr><td colSpan={9} className="po-empty">No purchase orders match the current filters.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

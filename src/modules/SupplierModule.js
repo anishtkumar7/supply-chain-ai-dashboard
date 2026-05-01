@@ -2,6 +2,8 @@ import { useMemo, useState, useCallback } from 'react';
 import { SupplierGlobe } from '../components/SupplierGlobe';
 import { DelayDetailModal } from '../components/DelayDetailModal';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useExportRegistration } from '../context/ExportRegistrationContext';
+import { supplierScorecardRows } from '../utils/exportUtils';
 
 const headquarters = { city: 'Chicago, IL', lat: 41.88, lng: -87.63 };
 
@@ -15,6 +17,9 @@ export function SupplierModule({ onComposeEmail }) {
   const { supplierData } = useDashboardData();
   const [focusSupplierId, setFocusSupplierId] = useState(null);
   const [search, setSearch] = useState('');
+  const [scorecardSearch, setScorecardSearch] = useState('');
+  const [riskFilter, setRiskFilter] = useState('All');
+  const [inboundFilter, setInboundFilter] = useState('All');
   const [delayModal, setDelayModal] = useState(null);
   const [contactSupplierId, setContactSupplierId] = useState(null);
   const [phoneModal, setPhoneModal] = useState(null);
@@ -32,6 +37,48 @@ export function SupplierModule({ onComposeEmail }) {
   }, [searchTrim, supplierData]);
 
   const clearFocus = useCallback(() => setFocusSupplierId(null), []);
+
+  const scorecardQ = scorecardSearch.trim().toLowerCase();
+  const filteredScorecard = useMemo(() => {
+    return supplierData.filter((s) => {
+      if (riskFilter !== 'All' && s.risk !== riskFilter) return false;
+      if (inboundFilter !== 'All') {
+        const inbound = String(s.inboundStatus || '').replace(/\s+/g, ' ').trim().toUpperCase();
+        const want = inboundFilter.toUpperCase().replace(/\s+/g, ' ');
+        if (inbound !== want) return false;
+      }
+      if (!scorecardQ) return true;
+      return (
+        s.name.toLowerCase().includes(scorecardQ) ||
+        s.country.toLowerCase().includes(scorecardQ)
+      );
+    });
+  }, [inboundFilter, riskFilter, scorecardQ, supplierData]);
+
+  const clearScorecardFilters = () => {
+    setScorecardSearch('');
+    setRiskFilter('All');
+    setInboundFilter('All');
+  };
+
+  const scorecardExportFilterNote = useMemo(() => {
+    const parts = [];
+    if (scorecardSearch.trim()) parts.push(`search="${scorecardSearch.trim()}"`);
+    if (riskFilter !== 'All') parts.push(`risk=${riskFilter}`);
+    if (inboundFilter !== 'All') parts.push(`inbound=${inboundFilter}`);
+    return parts.length ? parts.join('; ') : null;
+  }, [scorecardSearch, riskFilter, inboundFilter]);
+
+  const scorecardExportRows = useMemo(() => supplierScorecardRows(filteredScorecard), [filteredScorecard]);
+
+  useExportRegistration('suppliers', () => ({
+    rows: scorecardExportRows,
+    filterNote: scorecardExportFilterNote,
+    pdfModel: {
+      rows: scorecardExportRows,
+      filterLine: scorecardExportFilterNote || 'None',
+    },
+  }));
 
   const onArcIssueClick = useCallback((payload) => {
     setDelayModal(payload);
@@ -116,6 +163,46 @@ export function SupplierModule({ onComposeEmail }) {
           <h2>Supplier scorecard</h2>
           <span className="panel__meta">YTD spend & inbound lane health</span>
         </div>
+        <div className="table-filters">
+          <div className="table-filters__row">
+            <input
+              type="search"
+              className="globe-search"
+              placeholder="Search by supplier name or country…"
+              value={scorecardSearch}
+              onChange={(e) => setScorecardSearch(e.target.value)}
+              autoComplete="off"
+            />
+            <select
+              className="table-filters__select"
+              value={riskFilter}
+              onChange={(e) => setRiskFilter(e.target.value)}
+              aria-label="Filter by risk"
+            >
+              <option value="All">All</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+            </select>
+            <select
+              className="table-filters__select"
+              value={inboundFilter}
+              onChange={(e) => setInboundFilter(e.target.value)}
+              aria-label="Filter by inbound status"
+            >
+              <option value="All">All</option>
+              <option value="ON TIME">On Time</option>
+              <option value="DELAYED">Delayed</option>
+              <option value="STUCK">Stuck</option>
+            </select>
+            <button type="button" className="btn btn--ghost" onClick={clearScorecardFilters}>
+              Clear Filters
+            </button>
+          </div>
+          <p className="table-filters__count">
+            Showing {filteredScorecard.length} of {supplierData.length} results
+          </p>
+        </div>
         <div className="table-scroll">
           <table className="data-table data-table--click">
             <thead>
@@ -133,7 +220,7 @@ export function SupplierModule({ onComposeEmail }) {
               </tr>
             </thead>
             <tbody>
-              {supplierData.map((s) => (
+              {filteredScorecard.map((s) => (
                 <tr
                   key={s.id}
                   className={focusSupplierId === s.id ? 'data-table__row--active' : undefined}
@@ -250,6 +337,11 @@ export function SupplierModule({ onComposeEmail }) {
                   </td>
                 </tr>
               ))}
+              {filteredScorecard.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="po-empty">No suppliers match the current filters.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

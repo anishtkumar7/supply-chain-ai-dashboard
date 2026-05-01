@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { daysCoverFromWks } from '../utils/coverageDisplay';
 
 const PLANNER_ESCALATIONS_KEY = 'sc-planner-escalations';
 
@@ -100,7 +101,7 @@ export function AIAgentsModule({ onComposeEmail }) {
     const riskyOrders = customerOrderData.filter((o) =>
       skuData.some((s) => s.sku === o.sku && (s.status === 'CRITICAL' || s.status === 'WATCH'))
     );
-    const lowCover = skuData.filter((s) => s.wksCover < 1.5);
+    const lowCover = skuData.filter((s) => s.status === 'CRITICAL' || s.status === 'WATCH');
     const stuckSuppliers = supplierData.filter((s) => s.inboundStatus === 'STUCK' || s.otifPct < 95);
     const riskyShipments = shipmentData.filter((s) => s.status === 'STUCK' || s.status === 'DELAYED');
     const highBias = skuData.filter((s) => Math.abs(s.forecastBias) > 5);
@@ -135,7 +136,7 @@ export function AIAgentsModule({ onComposeEmail }) {
         runAtMs: nowMs - 4 * 60000,
         lastAction: lowCover.length ? 'Flagged low-cover SKU and checked inbound' : 'Inventory policy thresholds healthy',
         alert: lowCover.length
-          ? `${byLowCover.sku} at ${byLowCover.wksCover.toFixed(2)} weeks cover. No inbound shipment detected. Reorder triggered.`
+          ? `${byLowCover.sku} at ${daysCoverFromWks(byLowCover.wksCover)} days cover. No inbound shipment detected. Reorder triggered.`
           : null,
       },
       {
@@ -262,7 +263,7 @@ export function AIAgentsModule({ onComposeEmail }) {
                       recipientName: supplier.primaryContact.name,
                       recipientEmail: supplier.primaryContact.email,
                       subject: `Supplier Alert Follow Up — ${supplier.name}`,
-                      body: `Dear ${supplier.primaryContact.name},\n\nOur AI alert requires attention:\n${agent.alert}\n\nPlease provide status and recovery actions for open commitments.\n\nRegards,\nVectrum Supply Chain`,
+                      body: `Dear ${supplier.primaryContact.name},\n\nOur AI alert requires attention:\n${agent.alert}\n\nPlease provide status and recovery actions for open commitments.\n\nRegards,\nRIVIT`,
                     });
                   }}
                 >
@@ -371,7 +372,7 @@ export function AIAgentsModule({ onComposeEmail }) {
                     recipientName: internalContactModal.contact.name,
                     recipientEmail: internalContactModal.contact.email,
                     subject: `${internalContactModal.agent.module} alert follow-up`,
-                    body: `Hi ${internalContactModal.contact.name},\n\nPlease review the following alert:\n${internalContactModal.agent.alert}\n\nThanks,\nVectrum Control Tower`,
+                    body: `Hi ${internalContactModal.contact.name},\n\nPlease review the following alert:\n${internalContactModal.agent.alert}\n\nThanks,\nRIVIT`,
                   })
                 }
               >

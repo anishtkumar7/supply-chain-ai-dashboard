@@ -12,22 +12,11 @@ import {
   Tooltip,
 } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useExportRegistration } from '../context/ExportRegistrationContext';
+import { computeTradeRiskRows, tradeRiskTariffRowsFromComputed } from '../utils/exportUtils';
 
 const axisStyle = { fill: '#94a3b8', fontSize: 11 };
 const gridStroke = '#1e3a5f';
-
-const COUNTRY_TARIFF_RATES = {
-  China: 145,
-  Vietnam: 46,
-  Malaysia: 24,
-  Mexico: 0,
-  Germany: 10,
-  Netherlands: 10,
-  India: 26,
-  Canada: 0,
-};
-
-const LOW_TARIFF_COUNTRIES = new Set(['Mexico', 'Canada', 'Germany', 'Netherlands']);
 
 function formatUsd(n) {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
@@ -45,33 +34,37 @@ function riskPillClass(rate) {
 export function TradeRiskModule() {
   const { componentData, supplierData } = useDashboardData();
   const [filterMode, setFilterMode] = useState('all');
-  const supplierCountryMap = new Map(supplierData.map((s) => [s.id, s.country]));
-  const supplierNameMap = new Map(supplierData.map((s) => [s.id, s.name]));
 
-  const tariffRows = componentData.map((c) => {
-    const country = c.country || supplierCountryMap.get(c.supplierID) || 'Unknown';
-    const tariffRate = COUNTRY_TARIFF_RATES[country] ?? c.tariffRate ?? 0;
-    const annualSpend = c.extended;
-    const dutyCost = annualSpend * (tariffRate / 100);
-    const alternateAvailable = LOW_TARIFF_COUNTRIES.has(country) ? 'Yes' : 'No';
-    const risk = tariffRate > 25 ? 'HIGH' : tariffRate >= 10 ? 'MEDIUM' : 'LOW';
-    return {
-      componentSku: c.sku,
-      supplier: c.supplier || supplierNameMap.get(c.supplierID) || c.supplierID,
-      country,
-      tariffRate,
-      annualSpend,
-      dutyCost,
-      alternateAvailable,
-      risk,
-    };
-  });
+  const tariffRows = useMemo(
+    () => computeTradeRiskRows(componentData, supplierData),
+    [componentData, supplierData]
+  );
 
   const filteredRows = useMemo(() => {
     if (filterMode === 'high') return tariffRows.filter((r) => r.tariffRate > 25);
     if (filterMode === 'no-alt') return tariffRows.filter((r) => r.alternateAvailable === 'No');
     return tariffRows;
   }, [filterMode, tariffRows]);
+
+  const tradeExportFilterNote = useMemo(() => {
+    if (filterMode === 'high') return 'View: High tariff only (rate > 25%)';
+    if (filterMode === 'no-alt') return 'View: No low-tariff alternate country';
+    return null;
+  }, [filterMode]);
+
+  const tradeExportRows = useMemo(
+    () => tradeRiskTariffRowsFromComputed(filteredRows),
+    [filteredRows]
+  );
+
+  useExportRegistration('trade-risk', () => ({
+    rows: tradeExportRows,
+    filterNote: tradeExportFilterNote,
+    pdfModel: {
+      rows: tradeExportRows,
+      filterLine: tradeExportFilterNote || 'None',
+    },
+  }));
 
   const allCount = tariffRows.length;
   const highCount = tariffRows.filter((r) => r.tariffRate > 25).length;

@@ -18,6 +18,17 @@ import {
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
+function buildInitialAdjustmentHistory() {
+  const daysAgo = (n) => new Date(Date.now() - n * 86400000);
+  return [
+    { id: 'H1', timeLabel: '3 days ago', at: daysAgo(3), part: 'CMP-WRH-004', description: 'Wiring Harness', type: 'Write Off', quantity: 12, reason: 'Scrapped — defect', authorizedBy: 'J. Martinez', flagged: true },
+    { id: 'H2', timeLabel: '5 days ago', at: daysAgo(5), part: 'FG-T800-CL', description: 'Class 8 Highway Tractor', type: 'Transfer', quantity: 8, reason: 'Line 1 to Warehouse A', authorizedBy: 'S. Patel', flagged: false },
+    { id: 'H3', timeLabel: '7 days ago', at: daysAgo(7), part: 'CMP-ENG-001', description: 'Diesel Engine Assembly', type: 'Write On', quantity: 5, reason: 'Found in warehouse', authorizedBy: 'T. Williams', flagged: false },
+    { id: 'H4', timeLabel: '10 days ago', at: daysAgo(10), part: 'CMP-BAT-009', description: 'EV Battery Pack', type: 'Write Off', quantity: 3, reason: 'Damage', authorizedBy: 'R. Chen', flagged: false },
+    { id: 'H5', timeLabel: '14 days ago', at: daysAgo(14), part: 'FG-R450-CO', description: 'Regional Cab-Over Truck', type: 'Write Off', quantity: 15, reason: 'Obsolete', authorizedBy: 'K. Johnson', flagged: true },
+  ];
+}
+
 const DashboardDataContext = createContext(null);
 
 export const MODULE_IDS = {
@@ -48,6 +59,7 @@ export function DashboardDataProvider({ children }) {
   const [agentAlerts, setAgentAlerts] = useState(() => clone(initAgentAlerts));
   const [contactDirectory] = useState(() => clone(initContactDirectory));
   const [dirtyModules, setDirtyModules] = useState(() => new Set());
+  const [adjustmentHistory, setAdjustmentHistory] = useState(() => buildInitialAdjustmentHistory());
   const [lastManualUpload, setLastManualUpload] = useState({
     message: 'Using sample data',
     isSample: true,
@@ -131,6 +143,20 @@ export function DashboardDataProvider({ children }) {
     ]);
   }, []);
 
+  const addAdjustmentHistory = useCallback((entry) => {
+    const now = new Date();
+    setAdjustmentHistory((rows) => [
+      {
+        id: entry.id || `A${Date.now()}`,
+        timeLabel: entry.timeLabel || now.toLocaleString(),
+        at: entry.at || now,
+        flagged: false,
+        ...entry,
+      },
+      ...rows,
+    ]);
+  }, []);
+
   const value = useMemo(
     () => ({
       skuData,
@@ -158,6 +184,9 @@ export function DashboardDataProvider({ children }) {
       syncLog,
       addSyncLogEntry,
       MODULE_IDS,
+      adjustmentHistory,
+      setAdjustmentHistory,
+      addAdjustmentHistory,
     }),
     [
       skuData,
@@ -176,6 +205,8 @@ export function DashboardDataProvider({ children }) {
       lastManualUpload,
       syncLog,
       addSyncLogEntry,
+      adjustmentHistory,
+      addAdjustmentHistory,
     ]
   );
 

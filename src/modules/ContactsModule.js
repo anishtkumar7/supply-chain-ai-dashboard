@@ -74,7 +74,7 @@ export function ContactsModule({ onComposeEmail }) {
                   type="button"
                   className="icon-btn"
                   title="Email"
-                  onClick={() => onComposeEmail({ recipientName: s.primaryContact.name, recipientEmail: s.primaryContact.email, subject: `Vectrum Manufacturing — Supplier Follow Up — ${s.name}`, body: `Dear ${s.primaryContact.name},\n\nPlease share delivery schedule updates for current open orders with Vectrum Manufacturing.\n\nRegards,\nVectrum Supply Chain` })}
+                  onClick={() => onComposeEmail({ recipientName: s.primaryContact.name, recipientEmail: s.primaryContact.email, subject: `Vectrum Manufacturing — Supplier Follow Up — ${s.name}`, body: `Dear ${s.primaryContact.name},\n\nPlease share delivery schedule updates for current open orders with Vectrum Manufacturing.\n\nRegards,\nRIVIT` })}
                 >
                   ✉️
                 </button>

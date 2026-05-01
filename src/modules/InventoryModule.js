@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,9 +13,12 @@ import {
   BarChart,
 } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { daysCoverFromWks } from '../utils/coverageDisplay';
 
 const axisStyle = { fill: '#94a3b8', fontSize: 11 };
 const gridStroke = '#1e3a5f';
+const WRITE_ON_REASONS = ['Found in warehouse', 'Return from line', 'Supplier bonus stock', 'Cycle count adjustment'];
+const WRITE_OFF_REASONS = ['Scrapped — defect', 'Scrapped — damage', 'Obsolete', 'Lost — investigation required', 'Cycle count adjustment'];
 
 function formatUsd(n) {
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
@@ -22,8 +26,27 @@ function formatUsd(n) {
   return `$${n.toFixed(0)}`;
 }
 
-export function InventoryModule({ variant = 'fg' }) {
-  const { skuData, setSkuData, componentData, setComponentData, orderHistory, markModuleDirty, MODULE_IDS } = useDashboardData();
+export function InventoryModule({ variant = 'fg', currentRoleId, currentUserName = 'Dashboard User' }) {
+  const {
+    skuData,
+    setSkuData,
+    componentData,
+    setComponentData,
+    orderHistory,
+    markModuleDirty,
+    clearModuleDirty,
+    isModuleDirty,
+    addAdjustmentHistory,
+    MODULE_IDS,
+  } = useDashboardData();
+  const [fgEditMode, setFgEditMode] = useState(false);
+  const [componentsEditMode, setComponentsEditMode] = useState(false);
+  const [adjustModal, setAdjustModal] = useState(null);
+  const [adjustQty, setAdjustQty] = useState('');
+  const [adjustNotes, setAdjustNotes] = useState('');
+  const [adjustType, setAdjustType] = useState('Write On');
+  const [adjustReason, setAdjustReason] = useState(WRITE_ON_REASONS[0]);
+  const [adjustBy, setAdjustBy] = useState('Dashboard User');
   const inventoryRows = skuData.map((sku) => ({
     sku: sku.sku,
     product: sku.product,
@@ -55,6 +78,39 @@ export function InventoryModule({ variant = 'fg' }) {
     extValue: c.extended,
     unitCostUsd: c.unitCost,
   }));
+
+  const canEditFg = currentRoleId === 'admin' || currentRoleId === 'management';
+  const canEditComponents =
+    currentRoleId === 'admin' ||
+    currentRoleId === 'buyer-planner' ||
+    currentRoleId === 'material-coordinator';
+
+  const applyComponentAdjustment = () => {
+    if (!adjustModal) return;
+    const qty = Math.max(0, Math.floor(Number(adjustQty) || 0));
+    if (!qty) return;
+    const sign = adjustType === 'Write Off' ? -1 : 1;
+    setComponentData((list) =>
+      list.map((c) => {
+        if (c.sku !== adjustModal.component) return c;
+        const onHand = Math.max(0, c.onHand + sign * qty);
+        return { ...c, onHand, extended: onHand * c.unitCost };
+      })
+    );
+    addAdjustmentHistory({
+      part: adjustModal.component,
+      description: adjustModal.description,
+      type: adjustType,
+      quantity: qty,
+      reason: `${adjustReason}${adjustNotes ? ` — ${adjustNotes}` : ''}`,
+      authorizedBy: adjustBy || currentUserName,
+      flagged: adjustType === 'Write Off' && qty > 10,
+    });
+    markModuleDirty(MODULE_IDS.inventoryComponents);
+    setAdjustModal(null);
+    setAdjustQty('');
+    setAdjustNotes('');
+  };
 
   if (variant === 'components') {
     return (
@@ -114,7 +170,18 @@ export function InventoryModule({ variant = 'fg' }) {
         <section className="panel panel--span3">
           <div className="panel__head">
             <h2>Class A supply positions</h2>
-            <span className="panel__meta">Highest unit-cost inputs to finished goods</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="panel__meta">Highest unit-cost inputs to finished goods</span>
+              {canEditComponents && (
+                <button
+                  type="button"
+                  className="tag tag--switch"
+                  onClick={() => setComponentsEditMode((v) => !v)}
+                >
+                  Edit Mode: {componentsEditMode ? 'ON' : 'OFF'}
+                </button>
+              )}
+            </div>
           </div>
           <div className="table-scroll">
             <table className="data-table">
@@ -132,7 +199,7 @@ export function InventoryModule({ variant = 'fg' }) {
                 </tr>
               </thead>
               <tbody>
-                {classAChartData.map((row, rowIdx) => {
+                {classAChartData.map((row) => {
                   const ext = row.extValue;
                   return (
                     <tr key={row.component}>
@@ -140,33 +207,25 @@ export function InventoryModule({ variant = 'fg' }) {
                       <td>{row.description}</td>
                       <td className="mono">{row.drivesFG}</td>
                       <td>{row.supplier}</td>
-                      <td
-                        className="num"
-                        onClick={(e) => e.stopPropagation()}
-                        style={rowIdx === 0 ? { minWidth: 100 } : undefined}
-                      >
-                        {rowIdx === 0 ? (
-                          <input
-                            type="number"
-                            className="mono"
-                            value={row.onHand}
-                            min={0}
-                            onChange={(e) => {
-                              const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                              setComponentData((list) =>
-                                list.map((c) =>
-                                  c.sku === row.component
-                                    ? { ...c, onHand: v, extended: v * c.unitCost }
-                                    : c
-                                )
-                              );
-                              markModuleDirty(MODULE_IDS.inventoryComponents);
-                            }}
-                            style={{ width: 88, background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0' }}
-                          />
-                        ) : (
-                          row.onHand.toLocaleString()
-                        )}
+                      <td className="num">
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          style={{ minWidth: 88 }}
+                          disabled={!canEditComponents || !componentsEditMode}
+                          title={!canEditComponents ? 'Only Admin, Buyer / Planner, and Material Coordinator can edit.' : !componentsEditMode ? 'Enable Edit Mode to adjust quantity.' : 'Open Write On / Write Off adjustment'}
+                          onClick={() => {
+                            if (!canEditComponents || !componentsEditMode) return;
+                            setAdjustModal(row);
+                            setAdjustType('Write On');
+                            setAdjustReason(WRITE_ON_REASONS[0]);
+                            setAdjustQty('');
+                            setAdjustNotes('');
+                            setAdjustBy(currentUserName);
+                          }}
+                        >
+                          {row.onHand.toLocaleString()}
+                        </button>
                       </td>
                       <td className="num">${row.unitCostUsd.toLocaleString()}</td>
                       <td className="num">{formatUsd(ext)}</td>
@@ -183,6 +242,54 @@ export function InventoryModule({ variant = 'fg' }) {
             </table>
           </div>
         </section>
+        {adjustModal && (
+          <div className="po-modal-backdrop">
+            <div className="po-modal" style={{ maxWidth: 460 }}>
+              <h3>{adjustType}</h3>
+              <p className="panel__lede">
+                <span className="mono">{adjustModal.component}</span> — {adjustModal.description}
+              </p>
+              <label>
+                Adjustment type
+                <select
+                  value={adjustType}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    setAdjustType(nextType);
+                    setAdjustReason(nextType === 'Write Off' ? WRITE_OFF_REASONS[0] : WRITE_ON_REASONS[0]);
+                  }}
+                >
+                  <option>Write On</option>
+                  <option>Write Off</option>
+                </select>
+              </label>
+              <label>
+                Quantity
+                <input type="number" min={0} value={adjustQty} onChange={(e) => setAdjustQty(e.target.value)} />
+              </label>
+              <label>
+                Reason code
+                <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)}>
+                  {(adjustType === 'Write Off' ? WRITE_OFF_REASONS : WRITE_ON_REASONS).map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Notes
+                <input value={adjustNotes} onChange={(e) => setAdjustNotes(e.target.value)} />
+              </label>
+              <label>
+                Authorized by
+                <input value={adjustBy} onChange={(e) => setAdjustBy(e.target.value)} />
+              </label>
+              <div className="po-form-actions">
+                <button type="button" className="btn btn--ghost" onClick={() => setAdjustModal(null)}>Cancel</button>
+                <button type="button" className="btn btn--green" onClick={applyComponentAdjustment}>Submit</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -198,7 +305,7 @@ export function InventoryModule({ variant = 'fg' }) {
         <div className="inv-kpi">
           <span className="inv-kpi__label">SKUs at risk</span>
           <span className="inv-kpi__value inv-kpi__value--warn">{kpis.skusAtRisk}</span>
-          <span className="inv-kpi__hint">Watch + critical cover</span>
+          <span className="inv-kpi__hint">Watch + critical by days cover</span>
         </div>
         <div className="inv-kpi">
           <span className="inv-kpi__label">Inventory value</span>
@@ -270,9 +377,21 @@ export function InventoryModule({ variant = 'fg' }) {
       <section className="panel panel--span3">
         <div className="panel__head">
           <h2>Finished goods positions</h2>
-          <span className="panel__meta">
-            All DCs · sellable vs. committed · gross margin % (TTM blend by SKU)
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="panel__meta">
+              All DCs · sellable vs. committed · gross margin % (TTM blend by SKU)
+            </span>
+            {canEditFg && (
+              <button type="button" className="tag tag--switch" onClick={() => setFgEditMode((v) => !v)}>
+                Edit Mode: {fgEditMode ? 'ON' : 'OFF'}
+              </button>
+            )}
+            {isModuleDirty(MODULE_IDS.inventoryFg) && canEditFg && (
+              <button type="button" className="btn btn--green" onClick={() => clearModuleDirty(MODULE_IDS.inventoryFg)}>
+                Save
+              </button>
+            )}
+          </div>
         </div>
         <div className="table-scroll">
           <table className="data-table">
@@ -283,18 +402,18 @@ export function InventoryModule({ variant = 'fg' }) {
                 <th className="num">On hand</th>
                 <th className="num">Committed</th>
                 <th className="num">Available</th>
-                <th className="num">Wks cover</th>
+                <th className="num">Days cover</th>
                 <th>Status</th>
                 <th className="num">Gross margin</th>
               </tr>
             </thead>
             <tbody>
-              {inventoryRows.map((row, rowIdx) => (
+              {inventoryRows.map((row) => (
                 <tr key={row.sku}>
                   <td className="mono">{row.sku}</td>
                   <td>{row.product}</td>
                   <td className="num">
-                    {rowIdx === 0 ? (
+                    {canEditFg && fgEditMode ? (
                       <input
                         type="number"
                         className="num"
@@ -321,9 +440,13 @@ export function InventoryModule({ variant = 'fg' }) {
                   </td>
                   <td className="num">{row.committed.toLocaleString()}</td>
                   <td className="num">{row.available.toLocaleString()}</td>
-                  <td className="num">{row.weeksCover.toFixed(1)}</td>
+                  <td className="num">{daysCoverFromWks(row.weeksCover)}</td>
                   <td>
-                    <span className={`pill pill--${row.status === 'HEALTHY' ? 'healthy' : row.status === 'WATCH' ? 'watch' : 'critical'}`}>{row.status}</span>
+                    <span
+                      className={`pill pill--${row.status === 'HEALTHY' ? 'healthy' : row.status === 'WATCH' ? 'watch' : 'critical'}`}
+                    >
+                      {row.status}
+                    </span>
                   </td>
                   <td className={`num gross-margin ${row.grossMarginPct >= 35 ? 'gross-margin--strong' : ''}`}>
                     {row.grossMarginPct.toFixed(1)}%

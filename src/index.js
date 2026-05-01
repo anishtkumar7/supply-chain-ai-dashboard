@@ -4,12 +4,15 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { DashboardDataProvider } from './context/DashboardDataContext';
+import { ExportRegistrationProvider } from './context/ExportRegistrationContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <DashboardDataProvider>
-      <App />
+      <ExportRegistrationProvider>
+        <App />
+      </ExportRegistrationProvider>
     </DashboardDataProvider>
   </React.StrictMode>
 );

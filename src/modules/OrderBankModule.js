@@ -1,16 +1,43 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useExportRegistration } from '../context/ExportRegistrationContext';
+import { orderBankOrdersByFinishedGoodRows, orderHistoryExportRows } from '../utils/exportUtils';
 
 export function OrderBankModule() {
-  const { skuData, setSkuData, orderHistory, markModuleDirty, MODULE_IDS } = useDashboardData();
+  const { skuData, orderHistory } = useDashboardData();
   const [activeRow, setActiveRow] = useState(null);
-  const orderBankRows = skuData.map((sku) => ({
-    sku: sku.sku,
-    product: sku.product,
-    inBank: sku.ordersInBank,
-    inProcess: sku.ordersInProcess,
-    unitValue: sku.unitValue,
+  const [qtyHint, setQtyHint] = useState(null);
+  const [tableSearch, setTableSearch] = useState('');
+  const orderBankRows = useMemo(
+    () =>
+      skuData.map((sku) => ({
+        sku: sku.sku,
+        product: sku.product,
+        inBank: sku.ordersInBank,
+        inProcess: sku.ordersInProcess,
+        unitValue: sku.unitValue,
+      })),
+    [skuData]
+  );
+
+  const q = tableSearch.trim().toLowerCase();
+  const filteredRows = useMemo(() => {
+    if (!q) return orderBankRows;
+    return orderBankRows.filter(
+      (r) => r.sku.toLowerCase().includes(q) || r.product.toLowerCase().includes(q)
+    );
+  }, [orderBankRows, q]);
+
+  const orderBankFilterNote = useMemo(() => {
+    const t = tableSearch.trim();
+    return t ? `Orders by Finished Good filtered by search: "${t}"` : null;
+  }, [tableSearch]);
+
+  useExportRegistration('orderbank', () => ({
+    rows: orderBankOrdersByFinishedGoodRows(filteredRows),
+    filterNote: orderBankFilterNote,
+    extraSheets: { 'YoY Monthly History': orderHistoryExportRows(orderHistory) },
   }));
 
   const totalInBank = orderBankRows.reduce((sum, r) => sum + r.inBank, 0);
@@ -45,6 +72,28 @@ export function OrderBankModule() {
         <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#cbd5e1' }}>
           Orders by Finished Good
         </h3>
+        <div className="table-filters">
+          <div className="table-filters__row">
+            <input
+              type="search"
+              className="globe-search"
+              placeholder="Search by SKU or product name…"
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setTableSearch('')}
+            >
+              Clear Filters
+            </button>
+          </div>
+          <p className="table-filters__count">
+            Showing {filteredRows.length} of {orderBankRows.length} results
+          </p>
+        </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #334155' }}>
@@ -54,7 +103,7 @@ export function OrderBankModule() {
             </tr>
           </thead>
           <tbody>
-            {orderBankRows.map((row, idx) => (
+            {filteredRows.map((row) => (
               <tr
                 key={row.sku}
                 onClick={() => setActiveRow(activeRow === row.sku ? null : row.sku)}
@@ -69,23 +118,14 @@ export function OrderBankModule() {
                 <td style={{ padding: '10px 12px', color: '#ffffff', fontWeight: '500' }}>{row.product}</td>
                 <td
                   style={{ padding: '10px 12px', color: '#3b82f6', fontWeight: '600' }}
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQtyHint({ x: e.clientX, y: e.clientY });
+                    window.setTimeout(() => setQtyHint(null), 1500);
+                  }}
+                  title="Order quantities are managed in Customer Orders"
                 >
-                  {idx === 0 ? (
-                    <input
-                      type="number"
-                      min={0}
-                      value={row.inBank}
-                      onChange={(e) => {
-                        const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                        setSkuData((list) => list.map((s) => (s.sku === row.sku ? { ...s, ordersInBank: v } : s)));
-                        markModuleDirty(MODULE_IDS.orderbank);
-                      }}
-                      style={{ width: 72, background: '#0f172a', border: '1px solid #334155', color: '#3b82f6', borderRadius: 4, padding: 4 }}
-                    />
-                  ) : (
-                    row.inBank
-                  )}
+                  {row.inBank}
                 </td>
                 <td style={{ padding: '10px 12px', color: '#10b981', fontWeight: '600' }}>{row.inProcess}</td>
                 <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>{row.inBank + row.inProcess}</td>
@@ -118,6 +158,25 @@ export function OrderBankModule() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {qtyHint && (
+        <div
+          style={{
+            position: 'fixed',
+            left: qtyHint.x + 10,
+            top: qtyHint.y + 10,
+            zIndex: 1200,
+            background: '#0b1729',
+            border: '1px solid #334155',
+            color: '#cbd5e1',
+            borderRadius: 8,
+            padding: '6px 8px',
+            fontSize: 12,
+            pointerEvents: 'none',
+          }}
+        >
+          Order quantities are managed in Customer Orders
+        </div>
+      )}
     </div>
   );
 }

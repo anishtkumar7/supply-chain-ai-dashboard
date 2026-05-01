@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { daysCoverFromWks, isFgLowStockByDaysCover } from '../utils/coverageDisplay';
 
 const FG_LOCATIONS = [
   'Line 1 — Assembly',
@@ -94,73 +95,6 @@ function isThisMonth(d) {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth();
 }
 
-/** Seeded with relative `at` dates so "this month" KPIs stay meaningful */
-function buildInitialHistory() {
-  const daysAgo = (n) => new Date(Date.now() - n * 86400000);
-  return [
-    {
-      id: 'H1',
-      timeLabel: '3 days ago',
-      at: daysAgo(3),
-      part: 'CMP-WRH-004',
-      description: 'Wiring Harness',
-      type: 'Write Off',
-      quantity: 12,
-      reason: 'Scrapped — defect',
-      authorizedBy: 'J. Martinez',
-      flagged: true,
-    },
-    {
-      id: 'H2',
-      timeLabel: '5 days ago',
-      at: daysAgo(5),
-      part: 'FG-T800-CL',
-      description: 'Class 8 Highway Tractor',
-      type: 'Transfer',
-      quantity: 8,
-      reason: 'Line 1 to Warehouse A',
-      authorizedBy: 'S. Patel',
-      flagged: false,
-    },
-    {
-      id: 'H3',
-      timeLabel: '7 days ago',
-      at: daysAgo(7),
-      part: 'CMP-ENG-001',
-      description: 'Diesel Engine Assembly',
-      type: 'Write On',
-      quantity: 5,
-      reason: 'Found in warehouse',
-      authorizedBy: 'T. Williams',
-      flagged: false,
-    },
-    {
-      id: 'H4',
-      timeLabel: '10 days ago',
-      at: daysAgo(10),
-      part: 'CMP-BAT-009',
-      description: 'EV Battery Pack',
-      type: 'Write Off',
-      quantity: 3,
-      reason: 'Damage',
-      authorizedBy: 'R. Chen',
-      flagged: false,
-    },
-    {
-      id: 'H5',
-      timeLabel: '14 days ago',
-      at: daysAgo(14),
-      part: 'FG-R450-CO',
-      description: 'Regional Cab-Over Truck',
-      type: 'Write Off',
-      quantity: 15,
-      reason: 'Obsolete',
-      authorizedBy: 'K. Johnson',
-      flagged: true,
-    },
-  ];
-}
-
 function BlueprintLink({ sku }) {
   const href = `https://drawings.vectrum.com/parts/${encodeURIComponent(sku)}`;
   return (
@@ -171,7 +105,16 @@ function BlueprintLink({ sku }) {
 }
 
 export function PartsInventoryModule() {
-  const { skuData, setSkuData, componentData, setComponentData, markModuleDirty, MODULE_IDS } = useDashboardData();
+  const {
+    skuData,
+    setSkuData,
+    componentData,
+    setComponentData,
+    markModuleDirty,
+    MODULE_IDS,
+    adjustmentHistory: history,
+    addAdjustmentHistory,
+  } = useDashboardData();
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState(null);
   const [locationOverrides, setLocationOverrides] = useState({});
@@ -179,7 +122,6 @@ export function PartsInventoryModule() {
   const [writeOnOpen, setWriteOnOpen] = useState(false);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [reviewBanner, setReviewBanner] = useState(false);
-  const [history, setHistory] = useState(buildInitialHistory);
 
   const [toast, setToast] = useState(null);
 
@@ -211,8 +153,8 @@ export function PartsInventoryModule() {
   );
 
   const lowStockCount = useMemo(() => {
-    const fg = skuData.filter((s) => s.wksCover < 1.5).length;
-    const comp = componentData.filter((c) => (c.daysSupply != null && c.daysSupply < 15)).length;
+    const fg = skuData.filter((s) => isFgLowStockByDaysCover(s.wksCover)).length;
+    const comp = componentData.filter((c) => c.daysSupply != null && c.daysSupply < 8).length;
     return fg + comp;
   }, [skuData, componentData]);
 
@@ -327,22 +269,16 @@ export function PartsInventoryModule() {
     }));
     setTransferOpen(false);
     showToast(`Transfer submitted — ${qty} units of ${selected.sku} from ${tfFrom} to ${tfTo}`);
-    const now = new Date();
-    setHistory((h) => [
-      {
-        id: `T${Date.now()}`,
-        timeLabel: now.toLocaleString(),
-        at: now,
-        part: selected.sku,
-        description,
-        type: 'Transfer',
-        quantity: qty,
-        reason: `${tfFrom} to ${tfTo}${tfReason ? ` — ${tfReason}` : ''}`,
-        authorizedBy: tfBy,
-        flagged: false,
-      },
-      ...h,
-    ]);
+    addAdjustmentHistory({
+      id: `T${Date.now()}`,
+      part: selected.sku,
+      description,
+      type: 'Transfer',
+      quantity: qty,
+      reason: `${tfFrom} to ${tfTo}${tfReason ? ` — ${tfReason}` : ''}`,
+      authorizedBy: tfBy,
+      flagged: false,
+    });
     markModuleDirty(MODULE_IDS.inventoryParts);
     setTfFrom('');
     setTfTo('');
@@ -390,22 +326,16 @@ export function PartsInventoryModule() {
     setWNotes('');
     setWBy('');
     showToast('Adjustment recorded — inventory updated');
-    const nowO = new Date();
-    setHistory((h) => [
-      {
-        id: `O${Date.now()}`,
-        timeLabel: nowO.toLocaleString(),
-        at: nowO,
-        part: selected.sku,
-        description,
-        type: 'Write On',
-        quantity: n,
-        reason: rsn,
-        authorizedBy: by,
-        flagged: wf,
-      },
-      ...h,
-    ]);
+    addAdjustmentHistory({
+      id: `O${Date.now()}`,
+      part: selected.sku,
+      description,
+      type: 'Write On',
+      quantity: n,
+      reason: rsn,
+      authorizedBy: by,
+      flagged: wf,
+    });
     markModuleDirty(MODULE_IDS.inventoryParts);
   };
 
@@ -448,22 +378,16 @@ export function PartsInventoryModule() {
     setFBy('');
     setFFlag(false);
     showToast('Adjustment recorded — inventory updated');
-    const nowF = new Date();
-    setHistory((h) => [
-      {
-        id: `F${Date.now()}`,
-        timeLabel: nowF.toLocaleString(),
-        at: nowF,
-        part: selected.sku,
-        description,
-        type: 'Write Off',
-        quantity: n,
-        reason: rsn,
-        authorizedBy: auth,
-        flagged: wasFlag,
-      },
-      ...h,
-    ]);
+    addAdjustmentHistory({
+      id: `F${Date.now()}`,
+      part: selected.sku,
+      description,
+      type: 'Write Off',
+      quantity: n,
+      reason: rsn,
+      authorizedBy: auth,
+      flagged: wasFlag,
+    });
     markModuleDirty(MODULE_IDS.inventoryParts);
   };
 
@@ -506,7 +430,7 @@ export function PartsInventoryModule() {
           <div className="inv-kpi parts-inv__kpi" style={{ borderLeftColor: '#f87171' }}>
             <span className="inv-kpi__label">Low stock parts</span>
             <span className="inv-kpi__value" style={{ color: '#f87171' }}>{lowStockCount}</span>
-            <span className="inv-kpi__hint">FG: wks cover under 1.5 · Components: days supply under 15</span>
+            <span className="inv-kpi__hint">FG: days cover under 8 · Components: days supply under 8</span>
           </div>
         </div>
       </section>
@@ -568,6 +492,11 @@ export function PartsInventoryModule() {
                 {description}
               </p>
               <p className="panel__meta" style={{ margin: '0.2rem 0' }}>Product family: {isFg ? record.family : `Component · drives ${record.drivesFG || 'n/a'}`}</p>
+              {isFg && record.wksCover != null && (
+                <p className="panel__meta" style={{ margin: '0.2rem 0' }}>
+                  Days cover (rounded): {daysCoverFromWks(record.wksCover)}
+                </p>
+              )}
               <p className="panel__meta" style={{ margin: '0.35rem 0 0' }}>Blueprint / Schematic: <BlueprintLink sku={record.sku} /></p>
             </div>
             <div>

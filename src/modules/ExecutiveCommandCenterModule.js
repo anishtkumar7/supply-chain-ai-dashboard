@@ -1,19 +1,7 @@
 import { ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
-
-function formatUsd(n) {
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}k`;
-  return `$${n.toFixed(0)}`;
-}
-
-function severityRank(severity) {
-  if (severity === 'CRITICAL') return 3;
-  if (severity === 'HIGH') return 2;
-  if (severity === 'MEDIUM') return 1;
-  return 0;
-}
+import { computeExecutiveSummary } from '../utils/executiveSummaryMetrics';
+import { daysCoverFromWks } from '../utils/coverageDisplay';
 
 function skuPillClass(status) {
   if (status === 'HEALTHY') return 'pill pill--healthy';
@@ -23,16 +11,37 @@ function skuPillClass(status) {
 
 export function ExecutiveCommandCenterModule() {
   const { skuData, shipmentData, supplierData, componentData, agentAlerts } = useDashboardData();
-  const totalInventoryValue = skuData.reduce((sum, sku) => sum + sku.onHand * sku.unitValue, 0);
-  const avgBias = skuData.reduce((sum, sku) => sum + Math.abs(sku.forecastBias), 0) / skuData.length;
-  const forecastAccuracy = Math.max(0, 100 - avgBias);
-  const shipmentsAtRisk = shipmentData.filter((s) => s.status === 'DELAYED' || s.status === 'STUCK').length;
-  const supplierRiskAlerts = supplierData.filter((s) => s.risk === 'MEDIUM' || s.risk === 'HIGH').length;
-  const onTimeShipments = shipmentData.filter((s) => s.status === 'ON TIME').length;
-  const fillRate = (onTimeShipments / shipmentData.length) * 100;
-  const historicalOnTime = supplierData.reduce((sum, s) => sum + s.onTimeCount, 0);
-  const historicalTotal = supplierData.reduce((sum, s) => sum + s.onTimeCount + s.delayedCount + s.stuckCount, 0);
-  const baselineFillRate = historicalTotal ? (historicalOnTime / historicalTotal) * 100 : fillRate;
+  const summary = computeExecutiveSummary({
+    skuData,
+    shipmentData,
+    supplierData,
+    componentData,
+    agentAlerts,
+  });
+  const fillRate = (() => {
+    const healthyCount = skuData.filter((s) => s.status === 'HEALTHY').length;
+    const watchCount = skuData.filter((s) => s.status === 'WATCH').length;
+    const criticalCount = skuData.filter((s) => s.status === 'CRITICAL').length;
+    const total = skuData.length;
+    if (!total) return 0;
+    return parseFloat(
+      (((healthyCount * 1.0) + (watchCount * 0.85) + (criticalCount * 0.40)) / total * 100).toFixed(1)
+    );
+  })();
+
+  const {
+    totalInventoryValue,
+    totalInventoryValueFormatted,
+    forecastAccuracy,
+    shipmentsAtRisk,
+    supplierRiskAlerts,
+    plannedSpendFormatted,
+    receiptsFormatted,
+    spendDeltaFormatted,
+    spendDeltaPositive,
+    criticalPathSku,
+    exceptionFeed,
+  } = summary;
 
   const projectedPriorInventoryValue = skuData.reduce(
     (sum, sku) => sum + Math.max(0, sku.onHand - sku.committed) * sku.unitValue,
@@ -41,19 +50,6 @@ export function ExecutiveCommandCenterModule() {
   const inventoryWowPct = projectedPriorInventoryValue
     ? ((totalInventoryValue - projectedPriorInventoryValue) / projectedPriorInventoryValue) * 100
     : 0;
-
-  const fillRateTrend = fillRate >= baselineFillRate ? 'up' : 'down';
-
-  const plannedSpend = componentData.reduce((sum, c) => sum + c.netNeed * c.unitCost, 0);
-  const receipts = componentData.reduce((sum, c) => sum + Math.min(c.onHand, c.netNeed) * c.unitCost, 0);
-  const spendDelta = receipts - plannedSpend;
-
-  const criticalPathSku = [...skuData].sort((a, b) => a.wksCover - b.wksCover)[0];
-
-  const exceptionFeed = [...agentAlerts]
-    .filter((a) => a.status === 'ALERT' && a.alert)
-    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
-    .slice(0, 5);
   const sparklineData = skuData.map((sku) => ({
     sku: sku.sku,
     wksCover: sku.wksCover,
@@ -63,9 +59,9 @@ export function ExecutiveCommandCenterModule() {
 
   const statusDot = ({ cx, cy, payload }) => {
     if (typeof cx !== 'number' || typeof cy !== 'number') return null;
-    const fill =
-      payload?.status === 'HEALTHY' ? '#22c55e' : payload?.status === 'WATCH' ? '#f59e0b' : '#ef4444';
-    return <circle cx={cx} cy={cy} r={3} fill={fill} stroke="#0f172a" strokeWidth={1} />;
+    const st = payload?.status;
+    const fill = st === 'HEALTHY' ? '#22c55e' : st === 'WATCH' ? '#f59e0b' : '#ef4444';
+    return <circle cx={cx} cy={cy} r={3.5} fill={fill} stroke="#0f172a" strokeWidth={1} />;
   };
 
   return (
@@ -73,7 +69,7 @@ export function ExecutiveCommandCenterModule() {
       <section className="panel panel--span3 inv-kpis">
         <div className="inv-kpi">
           <span className="inv-kpi__label">Total Inventory Value</span>
-          <span className="inv-kpi__value">{formatUsd(totalInventoryValue)}</span>
+          <span className="inv-kpi__value">{totalInventoryValueFormatted}</span>
           <span className={`inv-kpi__hint ${inventoryWowPct >= 0 ? 'text-pos' : 'text-neg'}`}>
             {inventoryWowPct >= 0 ? '▲' : '▼'} {Math.abs(inventoryWowPct).toFixed(1)}% WoW
           </span>
@@ -81,9 +77,7 @@ export function ExecutiveCommandCenterModule() {
         <div className="inv-kpi">
           <span className="inv-kpi__label">Overall Fill Rate</span>
           <span className="inv-kpi__value">{fillRate.toFixed(1)}%</span>
-          <span className={`inv-kpi__hint ${fillRateTrend === 'up' ? 'text-pos' : 'text-neg'}`}>
-            {fillRateTrend === 'up' ? '▲ Improving' : '▼ Declining'}
-          </span>
+          <span className="inv-kpi__hint">Weighted average across all FG SKUs</span>
         </div>
         <div className="inv-kpi">
           <span className="inv-kpi__label">Shipments At Risk</span>
@@ -105,13 +99,17 @@ export function ExecutiveCommandCenterModule() {
       <section className="panel panel--span3">
         <div className="panel__head">
           <h2>Coverage Trend Strip</h2>
-          <span className="panel__meta">Compact sparkline · weeks cover by SKU</span>
+          <span className="panel__meta">Compact sparkline · days cover by SKU (from wks × 7)</span>
         </div>
-        <div className="chart-box chart-box--short">
+        <div className="chart-box chart-box--coverage-strip">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sparklineData} margin={{ top: 6, right: 8, left: 8, bottom: 2 }}>
+            <LineChart data={sparklineData} margin={{ top: 4, right: 6, left: 6, bottom: 2 }}>
               <Tooltip
-                formatter={(v, n) => [n === 'wksCover' ? `${Number(v).toFixed(2)} weeks` : `${Number(v).toFixed(1)}%`, n === 'wksCover' ? 'Weeks cover' : 'Forecast bias']}
+                formatter={(v, n) =>
+                  n === 'wksCover'
+                    ? [`${Math.round(Number(v) * 7)} days`, 'Days cover']
+                    : [`${Number(v).toFixed(1)}%`, 'Forecast bias']
+                }
                 contentStyle={{ background: '#0f1f36', border: '1px solid #1e3a5f', borderRadius: 8 }}
                 labelStyle={{ color: '#e2e8f0' }}
               />
@@ -132,7 +130,7 @@ export function ExecutiveCommandCenterModule() {
             <thead>
               <tr>
                 <th>SKU</th>
-                <th className="num">Wks cover</th>
+                <th className="num">Days cover</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -140,7 +138,7 @@ export function ExecutiveCommandCenterModule() {
               {skuData.map((sku) => (
                 <tr key={sku.sku}>
                   <td className="mono">{sku.sku}</td>
-                  <td className="num">{sku.wksCover.toFixed(2)}</td>
+                  <td className="num">{daysCoverFromWks(sku.wksCover)}</td>
                   <td>
                     <span className={skuPillClass(sku.status)}>{sku.status}</span>
                   </td>
@@ -179,22 +177,22 @@ export function ExecutiveCommandCenterModule() {
         <ul className="fact-list">
           <li>
             <span className="fact-list__k">Planned spend</span>
-            <span className="fact-list__v">{formatUsd(plannedSpend)}</span>
+            <span className="fact-list__v">{plannedSpendFormatted}</span>
           </li>
           <li>
             <span className="fact-list__k">Actual receipts</span>
-            <span className="fact-list__v">{formatUsd(receipts)}</span>
+            <span className="fact-list__v">{receiptsFormatted}</span>
           </li>
           <li>
             <span className="fact-list__k">Variance</span>
-            <span className={`fact-list__v ${spendDelta >= 0 ? 'text-pos' : 'text-neg'}`}>
-              {spendDelta >= 0 ? '+' : '-'}
-              {formatUsd(Math.abs(spendDelta))}
+            <span className={`fact-list__v ${spendDeltaPositive ? 'text-pos' : 'text-neg'}`}>
+              {spendDeltaPositive ? '+' : '-'}
+              {spendDeltaFormatted}
             </span>
           </li>
           <li>
             <span className="fact-list__k">Critical path SKU</span>
-            <span className="fact-list__v mono">{criticalPathSku.sku}</span>
+            <span className="fact-list__v mono">{criticalPathSku}</span>
           </li>
         </ul>
       </section>

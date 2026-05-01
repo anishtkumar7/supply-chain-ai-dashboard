@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react';
 import { ROLE_CARDS } from '../config/roleNavConfig';
+import { RivitLogo } from './RivitLogo';
 
 export function RoleLogin({ initialName, initialRoleId, onEnter }) {
   const [name, setName] = useState(() => (initialName || '').trim());
   const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId);
+  const roleCards = (() => {
+    const cards = [...ROLE_CARDS];
+    const shopIdx = cards.findIndex((card) => card.id === 'shop-supervisor');
+    if (shopIdx === -1) return cards;
+    const [shopCard] = cards.splice(shopIdx, 1);
+    cards.splice(4, 0, shopCard);
+    return cards;
+  })();
 
   useEffect(() => {
     setName((initialName || '').trim());
@@ -25,12 +34,13 @@ export function RoleLogin({ initialName, initialRoleId, onEnter }) {
         handleEnter();
       }}
     >
+      <div className="role-login__bg" aria-hidden />
       <div className="role-login__inner">
-        <div className="role-login__brand">
-          <span className="role-login__logo" aria-hidden />
-          <span className="role-login__name">SC Control</span>
+        <div className="role-login__brand role-login__brand--stack">
+          <RivitLogo variant="login" />
         </div>
-        <p className="role-login__sub">Vectrum Manufacturing — North America Hub</p>
+        <p className="role-login__tagline">Connect every role in your manufacturing operation.</p>
+        <p className="role-login__sub">Powered by RIVIT — Vectrum Manufacturing · North America Hub</p>
 
         <div className="role-login__field">
           <label className="role-login__label" htmlFor="role-login-name">Name</label>
@@ -48,7 +58,7 @@ export function RoleLogin({ initialName, initialRoleId, onEnter }) {
 
         <h2 className="role-login__section-title">Select Your Role</h2>
         <div className="role-login__grid">
-          {ROLE_CARDS.map((c) => (
+          {roleCards.map((c) => (
             <button
               key={c.id}
               type="button"

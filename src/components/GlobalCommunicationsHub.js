@@ -120,7 +120,7 @@ export function GlobalCommunicationsHub({ open, onClose, contactDirectory, suppl
                       recipientName: s.primaryContact.name,
                       recipientEmail: s.primaryContact.email,
                       subject: `Vectrum supplier follow-up — ${s.name}`,
-                      body: `Hello ${s.primaryContact.name},\n\n${supplierMessage}\n\nRegards,\nVectrum Supply Chain`,
+                      body: `Hello ${s.primaryContact.name},\n\n${supplierMessage}\n\nRegards,\nRIVIT`,
                     })}
                   >
                     Email Supplier

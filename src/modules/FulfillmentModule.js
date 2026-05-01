@@ -1,7 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { FulfillmentGlobe } from '../components/FulfillmentGlobe';
 import { DelayDetailModal } from '../components/DelayDetailModal';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useExportRegistration } from '../context/ExportRegistrationContext';
+import { fulfillmentShipmentRows } from '../utils/exportUtils';
 
 function routePillClass(status) {
   if (status === 'on_time' || status === 'at_sea' || status === 'in_transit') return 'lane lane--on';
@@ -25,6 +27,44 @@ export function FulfillmentModule({ onComposeEmail }) {
   const [delayModal, setDelayModal] = useState(null);
   const [phoneModal, setPhoneModal] = useState(null);
   const [contactShipmentId, setContactShipmentId] = useState(null);
+  const [shipmentSearch, setShipmentSearch] = useState('');
+  const [shipmentStatusFilter, setShipmentStatusFilter] = useState('All');
+  const [shipmentModeFilter, setShipmentModeFilter] = useState('All');
+
+  const shipmentQ = shipmentSearch.trim().toLowerCase();
+  const filteredShipments = useMemo(() => {
+    return shipmentData.filter((s) => {
+      if (shipmentStatusFilter !== 'All' && s.status !== shipmentStatusFilter) return false;
+      if (shipmentModeFilter !== 'All' && s.mode !== shipmentModeFilter) return false;
+      if (!shipmentQ) return true;
+      const hay = `${s.id} ${s.sku} ${s.carrier}`.toLowerCase();
+      return hay.includes(shipmentQ);
+    });
+  }, [shipmentData, shipmentModeFilter, shipmentQ, shipmentStatusFilter]);
+
+  const shipmentExportFilterNote = useMemo(() => {
+    const parts = [];
+    if (shipmentSearch.trim()) parts.push(`search="${shipmentSearch.trim()}"`);
+    if (shipmentStatusFilter !== 'All') parts.push(`status=${shipmentStatusFilter}`);
+    if (shipmentModeFilter !== 'All') parts.push(`mode=${shipmentModeFilter}`);
+    return parts.length ? parts.join('; ') : null;
+  }, [shipmentSearch, shipmentStatusFilter, shipmentModeFilter]);
+
+  const shipmentExportRows = useMemo(
+    () => fulfillmentShipmentRows(filteredShipments),
+    [filteredShipments]
+  );
+
+  useExportRegistration('fulfillment', () => ({
+    rows: shipmentExportRows,
+    filterNote: shipmentExportFilterNote,
+  }));
+
+  const clearShipmentFilters = () => {
+    setShipmentSearch('');
+    setShipmentStatusFilter('All');
+    setShipmentModeFilter('All');
+  };
 
   const clearFocus = useCallback(() => setFocusShipmentId(null), []);
   const onArcIssueClick = useCallback((payload) => setDelayModal(payload), []);
@@ -71,6 +111,47 @@ export function FulfillmentModule({ onComposeEmail }) {
           <h2>In-transit detail</h2>
           <span className="panel__meta">{shipmentData.length} active shipments</span>
         </div>
+        <div className="table-filters">
+          <div className="table-filters__row">
+            <input
+              type="search"
+              className="globe-search"
+              placeholder="Search by shipment ID, SKU, or carrier…"
+              value={shipmentSearch}
+              onChange={(e) => setShipmentSearch(e.target.value)}
+              autoComplete="off"
+            />
+            <select
+              className="table-filters__select"
+              value={shipmentStatusFilter}
+              onChange={(e) => setShipmentStatusFilter(e.target.value)}
+              aria-label="Filter by shipment status"
+            >
+              <option value="All">All</option>
+              <option value="ON TIME">On Time</option>
+              <option value="DELAYED">Delayed</option>
+              <option value="STUCK">Stuck</option>
+            </select>
+            <select
+              className="table-filters__select"
+              value={shipmentModeFilter}
+              onChange={(e) => setShipmentModeFilter(e.target.value)}
+              aria-label="Filter by transport mode"
+            >
+              <option value="All">All</option>
+              <option value="Ocean">Ocean</option>
+              <option value="Truck">Truck</option>
+              <option value="Rail">Rail</option>
+              <option value="Air">Air</option>
+            </select>
+            <button type="button" className="btn btn--ghost" onClick={clearShipmentFilters}>
+              Clear Filters
+            </button>
+          </div>
+          <p className="table-filters__count">
+            Showing {filteredShipments.length} of {shipmentData.length} results
+          </p>
+        </div>
         <div className="table-scroll">
           <table className="data-table data-table--click">
             <thead>
@@ -88,7 +169,7 @@ export function FulfillmentModule({ onComposeEmail }) {
               </tr>
             </thead>
             <tbody>
-              {shipmentData.map((s) => (
+              {filteredShipments.map((s) => (
                 <tr
                   key={s.id}
                   className={focusShipmentId === s.id ? 'data-table__row--active' : undefined}
@@ -202,6 +283,11 @@ export function FulfillmentModule({ onComposeEmail }) {
                   </td>
                 </tr>
               ))}
+              {filteredShipments.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="po-empty">No shipments match the current filters.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

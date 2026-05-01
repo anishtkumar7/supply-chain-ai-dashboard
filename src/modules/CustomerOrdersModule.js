@@ -65,7 +65,12 @@ export function CustomerOrdersModule({ onComposeEmail }) {
   const openCount = orders.length;
   const onTimePct = (orders.filter((o) => o.atpStatus === 'CONFIRMED').length / orders.length) * 100;
   const atRiskCount = orders.filter((o) => o.atpStatus !== 'CONFIRMED').length;
-  const avgDaysToShip = orders.reduce((sum, o) => sum + o.dueInDays, 0) / orders.length;
+  const shortfallValue = orders
+    .filter((o) => o.atpStatus === 'AT RISK' || o.atpStatus === 'BREACHED')
+    .reduce((sum, o) => {
+      const sku = skuData.find((s) => s.sku === o.sku);
+      return sum + o.shortfall * (sku?.unitValue || 0);
+    }, 0);
 
   const selected = activeOrder ? orders.find((o) => o.id === activeOrder) : null;
 
@@ -79,8 +84,8 @@ export function CustomerOrdersModule({ onComposeEmail }) {
         </div>
         <div className="inv-kpi">
           <span className="inv-kpi__label">Orders On Time %</span>
-          <span className="inv-kpi__value">{onTimePct.toFixed(1)}%</span>
-          <span className="inv-kpi__hint">ATP confirmed coverage</span>
+          <span className={`inv-kpi__value ${onTimePct < 50 ? 'inv-kpi__value--warn' : ''}`}>{onTimePct.toFixed(1)}%</span>
+          <span className="inv-kpi__hint">ATP confirmed — 3 of 8 orders fully covered</span>
         </div>
         <div className="inv-kpi">
           <span className="inv-kpi__label">Orders At Risk</span>
@@ -88,9 +93,9 @@ export function CustomerOrdersModule({ onComposeEmail }) {
           <span className="inv-kpi__hint">AT RISK + BREACHED</span>
         </div>
         <div className="inv-kpi">
-          <span className="inv-kpi__label">Average Days to Ship</span>
-          <span className="inv-kpi__value">{avgDaysToShip.toFixed(1)}</span>
-          <span className="inv-kpi__hint">Until customer promise date</span>
+          <span className="inv-kpi__label">Inventory Shortfall Value</span>
+          <span className="inv-kpi__value inv-kpi__value--warn">${(shortfallValue / 1e6).toFixed(2)}M</span>
+          <span className="inv-kpi__hint">Value of short units across AT RISK + BREACHED orders</span>
         </div>
       </section>
 
