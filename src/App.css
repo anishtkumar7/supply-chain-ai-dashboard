@@ -198,15 +198,16 @@
 .role-login__grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
   margin-bottom: 1.35rem;
 }
 
-@media (min-width: 720px) {
-  .role-login__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.role-card-placeholder {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  content: '';
 }
 
 .role-card {

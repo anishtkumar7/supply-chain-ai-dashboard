@@ -5,14 +5,21 @@ import { RivitLogo } from './RivitLogo';
 export function RoleLogin({ initialName, initialRoleId, onEnter }) {
   const [name, setName] = useState(() => (initialName || '').trim());
   const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId);
-  const roleCards = (() => {
-    const cards = [...ROLE_CARDS];
-    const shopIdx = cards.findIndex((card) => card.id === 'shop-supervisor');
-    if (shopIdx === -1) return cards;
-    const [shopCard] = cards.splice(shopIdx, 1);
-    cards.splice(4, 0, shopCard);
-    return cards;
-  })();
+  const roleCardsById = ROLE_CARDS.reduce((acc, card) => {
+    acc[card.id] = card;
+    return acc;
+  }, {});
+  const roleGridLayout = [
+    'shop-supervisor',
+    'material-coordinator',
+    'buyer-planner',
+    'mfg-engineer',
+    'warehouse',
+    'management',
+    null,
+    'admin',
+    null,
+  ];
 
   useEffect(() => {
     setName((initialName || '').trim());
@@ -58,18 +65,25 @@ export function RoleLogin({ initialName, initialRoleId, onEnter }) {
 
         <h2 className="role-login__section-title">Select Your Role</h2>
         <div className="role-login__grid">
-          {roleCards.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={`role-card ${selectedRoleId === c.id ? 'role-card--selected' : ''}`}
-              onClick={() => setSelectedRoleId(c.id)}
-            >
-              <span className="role-card__icon" aria-hidden>{c.icon}</span>
-              <span className="role-card__title">{c.title}</span>
-              <span className="role-card__desc">{c.description}</span>
-            </button>
-          ))}
+          {roleGridLayout.map((roleId, idx) => {
+            if (!roleId) {
+              return <div key={`placeholder-${idx}`} className="role-card-placeholder" aria-hidden="true" />;
+            }
+            const c = roleCardsById[roleId];
+            if (!c) return null;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                className={`role-card ${selectedRoleId === c.id ? 'role-card--selected' : ''}`}
+                onClick={() => setSelectedRoleId(c.id)}
+              >
+                <span className="role-card__icon" aria-hidden>{c.icon}</span>
+                <span className="role-card__title">{c.title}</span>
+                <span className="role-card__desc">{c.description}</span>
+              </button>
+            );
+          })}
         </div>
 
         <button
