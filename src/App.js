@@ -19,6 +19,8 @@ import { PurchaseOrdersModule } from './modules/PurchaseOrdersModule';
 import { ContactsModule } from './modules/ContactsModule';
 import { ReceivingModule } from './modules/ReceivingModule';
 import { ShopFloorModule } from './modules/ShopFloorModule';
+import { AttentionQueueModule } from './modules/AttentionQueueModule';
+import { AgenticPlaybookModule } from './modules/AgenticPlaybookModule';
 import { useDashboardData } from './context/DashboardDataContext';
 import {
   computeTradeRiskRows,
@@ -37,6 +39,8 @@ import {
   CONTACTS_ID,
   RECEIVING_ID,
   SHOP_FLOOR_ID,
+  ATTENTION_QUEUE_ID,
+  AGENTIC_PLAYBOOK_ID,
 } from './config/roleNavConfig';
 import { RoleLogin } from './components/RoleLogin';
 import { RivitLogo } from './components/RivitLogo';
@@ -45,6 +49,7 @@ import { GlobalCommunicationsHub } from './components/GlobalCommunicationsHub';
 import { EmailComposeModal } from './components/EmailComposeModal';
 import { ExecutivePdfPrintView } from './components/ExecutivePdfPrintView';
 import { GenericPdfPrintView } from './components/GenericPdfPrintView';
+import { SyncHealthStrip } from './components/SyncHealthStrip';
 import { useExportRegistrationContext } from './context/ExportRegistrationContext';
 
 const RIVIT_AI_OPENING =
@@ -64,6 +69,8 @@ const views = {
 };
 
 function activeToModuleId(active) {
+  if (active === ATTENTION_QUEUE_ID) return 'attention-queue';
+  if (active === AGENTIC_PLAYBOOK_ID) return 'agentic-playbook';
   if (active === inventoryNavIds.fg) return 'inventory-fg';
   if (active === inventoryNavIds.components) return 'inventory-components';
   if (active === inventoryNavIds.parts) return 'inventory-parts';
@@ -136,6 +143,29 @@ function allowedCategoriesForRole(roleId) {
   return null;
 }
 
+const DENSITY_STORAGE_KEY = 'sc-ui-density';
+
+/** @returns {'compact' | 'comfortable' | null} */
+function readStoredDensity() {
+  try {
+    const v = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+    if (v === 'compact' || v === 'comfortable') return v;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function defaultDensityForRole(roleId) {
+  if (roleId === 'buyer-planner') return 'compact';
+  if (roleId === 'management') return 'comfortable';
+  return 'comfortable';
+}
+
+function getInitialDensity(roleId) {
+  return readStoredDensity() ?? defaultDensityForRole(roleId);
+}
+
 function defaultNotificationsFromAgents(agentAlerts) {
   return agentAlerts
     .filter((a) => a.alert)
@@ -162,6 +192,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
   const invIdSet = useMemo(() => allInventoryChildIdsForRole(segments), [segments]);
   const [active, setActive] = useState(() => defaultActive);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [density, setDensity] = useState(() => getInitialDensity(roleId));
   const [inventoryOpen, setInventoryOpen] = useState(true);
   const [planningOpen, setPlanningOpen] = useState(true);
   const [fulfillmentOpen, setFulfillmentOpen] = useState(true);
@@ -272,6 +303,14 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
       setInventoryOpen(true);
     }
   }, [active, invIdSet]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+    } catch {
+      /* ignore */
+    }
+  }, [density]);
 
   useEffect(() => {
     const close = (e) => {
@@ -533,27 +572,6 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     }
   }, [aiInput, aiLoading, aiMessages, skuData, componentData, supplierData, shipmentData, orderHistory, customerOrderData, agentAlerts]);
 
-  const ActiveView = useMemo(() => {
-    if (active === 'executive') return () => <ExecutiveCommandCenterModule />;
-    if (active === 'orderbank') return () => <OrderBankModule />;
-    if (active === 'customer-orders') return () => <CustomerOrdersModule onComposeEmail={openCompose} />;
-    if (active === 'trade-risk') return () => <TradeRiskModule />;
-    if (active === 'data-sync') return () => <DataSyncModule />;
-    if (active === 'suppliers') return () => <SupplierModule onComposeEmail={openCompose} />;
-    if (active === 'fulfillment') return () => <FulfillmentModule onComposeEmail={openCompose} />;
-    if (active === 'agents') return () => <AIAgentsModule onComposeEmail={openCompose} />;
-    if (active === PRODUCTION_PLANNING_ID) return () => <ProductionPlanningModule onComposeEmail={openCompose} />;
-    if (active === PURCHASE_ORDERS_ID) return () => <PurchaseOrdersModule onComposeEmail={openCompose} />;
-    if (active === RECEIVING_ID) return () => <ReceivingModule loggedInName={displayName} onComposeEmail={openCompose} />;
-    if (active === SHOP_FLOOR_ID) return () => <ShopFloorModule onComposeEmail={openCompose} />;
-    if (active === CONTACTS_ID) return () => <ContactsModule onComposeEmail={openCompose} />;
-    if (active === inventoryNavIds.fg) return () => <InventoryModule variant="fg" currentRoleId={roleId} currentUserName={displayName} />;
-    if (active === inventoryNavIds.components) return () => <InventoryModule variant="components" currentRoleId={roleId} currentUserName={displayName} />;
-    if (active === inventoryNavIds.parts) return () => <PartsInventoryModule />;
-    const Comp = views[active];
-    return Comp ? () => <Comp /> : () => <InventoryModule variant="fg" />;
-  }, [active, openCompose, displayName, roleId]);
-
   const selectInventoryChild = useCallback(
     (id) => {
       setActive(id);
@@ -591,6 +609,42 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     return { allowedIds, inventoryChildren };
   }, [segments]);
 
+  const navigateFromAttention = useCallback(
+    (navId) => {
+      if (access.allowedIds.has(navId)) {
+        setActive(navId);
+        return;
+      }
+      if (access.allowedIds.has('agents')) {
+        setActive('agents');
+      }
+    },
+    [access.allowedIds]
+  );
+
+  const ActiveView = useMemo(() => {
+    if (active === ATTENTION_QUEUE_ID) return () => <AttentionQueueModule onNavigate={navigateFromAttention} />;
+    if (active === AGENTIC_PLAYBOOK_ID) return () => <AgenticPlaybookModule />;
+    if (active === 'executive') return () => <ExecutiveCommandCenterModule />;
+    if (active === 'orderbank') return () => <OrderBankModule />;
+    if (active === 'customer-orders') return () => <CustomerOrdersModule onComposeEmail={openCompose} />;
+    if (active === 'trade-risk') return () => <TradeRiskModule />;
+    if (active === 'data-sync') return () => <DataSyncModule />;
+    if (active === 'suppliers') return () => <SupplierModule onComposeEmail={openCompose} />;
+    if (active === 'fulfillment') return () => <FulfillmentModule onComposeEmail={openCompose} />;
+    if (active === 'agents') return () => <AIAgentsModule onComposeEmail={openCompose} />;
+    if (active === PRODUCTION_PLANNING_ID) return () => <ProductionPlanningModule onComposeEmail={openCompose} />;
+    if (active === PURCHASE_ORDERS_ID) return () => <PurchaseOrdersModule onComposeEmail={openCompose} />;
+    if (active === RECEIVING_ID) return () => <ReceivingModule loggedInName={displayName} onComposeEmail={openCompose} />;
+    if (active === SHOP_FLOOR_ID) return () => <ShopFloorModule onComposeEmail={openCompose} />;
+    if (active === CONTACTS_ID) return () => <ContactsModule onComposeEmail={openCompose} />;
+    if (active === inventoryNavIds.fg) return () => <InventoryModule variant="fg" currentRoleId={roleId} currentUserName={displayName} />;
+    if (active === inventoryNavIds.components) return () => <InventoryModule variant="components" currentRoleId={roleId} currentUserName={displayName} />;
+    if (active === inventoryNavIds.parts) return () => <PartsInventoryModule />;
+    const Comp = views[active];
+    return Comp ? () => <Comp /> : () => <InventoryModule variant="fg" />;
+  }, [active, navigateFromAttention, openCompose, displayName, roleId]);
+
   const renderNavItem = useCallback(
     (id, key) => {
       const item = getNavMeta(id);
@@ -620,7 +674,9 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
   const logisticsChildren = [RECEIVING_ID].filter((id) => access.allowedIds.has(id));
   const showLogisticsGroup = access.allowedIds.has('fulfillment') || logisticsChildren.length > 0;
 
-  const topSectionItems = ['executive', 'orderbank', 'customer-orders'].filter((id) => access.allowedIds.has(id));
+  const topSectionItems = ['executive', ATTENTION_QUEUE_ID, AGENTIC_PLAYBOOK_ID, 'orderbank', 'customer-orders'].filter(
+    (id) => access.allowedIds.has(id)
+  );
   const showProductionSection = [PRODUCTION_PLANNING_ID, SHOP_FLOOR_ID].some((id) => access.allowedIds.has(id));
   const showProcurementSection = ['suppliers', 'trade-risk'].some((id) => access.allowedIds.has(id)) || showPlanningGroup;
   const showDemandSection = access.allowedIds.has('demand');
@@ -641,7 +697,11 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
 
   return (
     <>
-    <div className={`app-shell print-exec-skip ${sidebarCollapsed ? 'app-shell--collapsed' : ''}`}>
+    <div
+      className={`app-shell print-exec-skip ${sidebarCollapsed ? 'app-shell--collapsed' : ''} ${
+        density === 'compact' ? 'density-compact' : 'density-comfortable'
+      }`}
+    >
       <aside className="sidebar" aria-label="Primary">
         <div className="sidebar__brand">
           <RivitLogo variant={sidebarCollapsed ? 'icon' : 'sidebar'} />
@@ -894,6 +954,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
             </div>
             <p className="top-header__sub top-header__welcome">{welcome}</p>
             <p className="top-header__sub top-header__sub--meta">North America hub · live sample dataset</p>
+            <SyncHealthStrip syncLog={syncLog} lastManualUpload={lastManualUpload} />
           </div>
           <div
             className="top-header__tags"
@@ -908,6 +969,24 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
               🔔
               {unreadCount > 0 && <span className="notif-bell__badge">{unreadCount}</span>}
             </button>
+            <div className="density-toggle" role="group" aria-label="Display density">
+              <button
+                type="button"
+                className={`tag tag--switch density-toggle__btn ${density === 'comfortable' ? 'density-toggle__btn--active' : ''}`}
+                onClick={() => setDensity('comfortable')}
+                aria-pressed={density === 'comfortable'}
+              >
+                Comfortable
+              </button>
+              <button
+                type="button"
+                className={`tag tag--switch density-toggle__btn ${density === 'compact' ? 'density-toggle__btn--active' : ''}`}
+                onClick={() => setDensity('compact')}
+                aria-pressed={density === 'compact'}
+              >
+                Compact
+              </button>
+            </div>
             <button type="button" className="tag tag--switch" onClick={runMrp}>MRP Nightly</button>
             <button
               type="button"

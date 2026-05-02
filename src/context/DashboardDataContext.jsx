@@ -65,48 +65,56 @@ export function DashboardDataProvider({ children }) {
     isSample: true,
     at: null,
   });
-  const [syncLog, setSyncLog] = useState(() => [
-    {
-      id: 'l1',
-      time: 'Today 9:42am',
-      type: 'Manual Upload',
-      details: 'Finished Goods CSV',
-      records: 7,
-      status: 'SUCCESS',
-    },
-    {
-      id: 'l2',
-      time: 'Today 9:40am',
-      type: 'Manual Upload',
-      details: 'Component CSV',
-      records: 10,
-      status: 'SUCCESS',
-    },
-    {
-      id: 'l3',
-      time: 'Yesterday 11:30pm',
-      type: 'Auto Sync Attempt',
-      details: 'ERP not connected',
-      records: 0,
-      status: 'FAILED',
-    },
-    {
-      id: 'l4',
-      time: 'Yesterday 6:00pm',
-      type: 'Manual Upload',
-      details: 'Supplier List',
-      records: 9,
-      status: 'SUCCESS',
-    },
-    {
-      id: 'l5',
-      time: 'Yesterday 2:15pm',
-      type: 'Google Sheets Sync',
-      details: 'Demand Forecast tab',
-      records: 7,
-      status: 'SUCCESS',
-    },
-  ]);
+  const [syncLog, setSyncLog] = useState(() => {
+    const now = Date.now();
+    return [
+      {
+        id: 'l1',
+        time: 'Today 9:42am',
+        atMs: now - 3 * 3600000,
+        type: 'Manual Upload',
+        details: 'Finished Goods CSV',
+        records: 7,
+        status: 'SUCCESS',
+      },
+      {
+        id: 'l2',
+        time: 'Today 9:40am',
+        atMs: now - 5 * 3600000,
+        type: 'Manual Upload',
+        details: 'Component CSV',
+        records: 10,
+        status: 'SUCCESS',
+      },
+      {
+        id: 'l3',
+        time: 'Yesterday 11:30pm',
+        atMs: now - 12 * 3600000,
+        type: 'Auto Sync Attempt',
+        details: 'ERP not connected',
+        records: 0,
+        status: 'FAILED',
+      },
+      {
+        id: 'l4',
+        time: 'Yesterday 6:00pm',
+        atMs: now - 20 * 3600000,
+        type: 'Manual Upload',
+        details: 'Supplier List',
+        records: 9,
+        status: 'SUCCESS',
+      },
+      {
+        id: 'l5',
+        time: 'Yesterday 2:15pm',
+        atMs: now - 28 * 3600000,
+        type: 'Google Sheets Sync',
+        details: 'Demand Forecast tab',
+        records: 7,
+        status: 'SUCCESS',
+      },
+    ];
+  });
 
   const markModuleDirty = useCallback((moduleId) => {
     if (!moduleId) return;
@@ -138,7 +146,7 @@ export function DashboardDataProvider({ children }) {
       minute: '2-digit',
     });
     setSyncLog((rows) => [
-      { id: `l-${Date.now()}`, time, ...entry },
+      { id: `l-${Date.now()}`, time, ...entry, atMs: entry.atMs ?? Date.now() },
       ...rows,
     ]);
   }, []);

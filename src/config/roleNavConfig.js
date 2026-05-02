@@ -5,6 +5,8 @@ export const PURCHASE_ORDERS_ID = 'purchase-orders';
 export const CONTACTS_ID = 'contacts';
 export const RECEIVING_ID = 'receiving';
 export const SHOP_FLOOR_ID = 'shop-floor';
+export const ATTENTION_QUEUE_ID = 'attention-queue';
+export const AGENTIC_PLAYBOOK_ID = 'agentic-playbook';
 
 const byId = new Map([
   ...topNavItems.map((x) => [x.id, x]),
@@ -29,6 +31,14 @@ const byId = new Map([
   [
     SHOP_FLOOR_ID,
     { id: SHOP_FLOOR_ID, label: 'Shop Floor', shortLabel: 'Floor' },
+  ],
+  [
+    ATTENTION_QUEUE_ID,
+    { id: ATTENTION_QUEUE_ID, label: 'Attention queue', shortLabel: 'Queue' },
+  ],
+  [
+    AGENTIC_PLAYBOOK_ID,
+    { id: AGENTIC_PLAYBOOK_ID, label: 'Agentic playbook', shortLabel: 'Play' },
   ],
 ]);
 
@@ -56,6 +66,8 @@ export const ROLES = {
     label: 'Admin',
     segments: [
       { type: 'item', id: 'executive' },
+      { type: 'item', id: ATTENTION_QUEUE_ID },
+      { type: 'item', id: AGENTIC_PLAYBOOK_ID },
       { type: 'item', id: 'orderbank' },
       { type: 'item', id: 'customer-orders' },
       { type: 'item', id: PRODUCTION_PLANNING_ID },
@@ -75,8 +87,11 @@ export const ROLES = {
     id: 'material-coordinator',
     label: 'Material Coordinator',
     segments: [
+      { type: 'item', id: ATTENTION_QUEUE_ID },
+      { type: 'item', id: AGENTIC_PLAYBOOK_ID },
       { type: 'item', id: inventoryNavIds.parts },
       { type: 'inventory', keys: ['components'] },
+      { type: 'item', id: PRODUCTION_PLANNING_ID },
       { type: 'item', id: SHOP_FLOOR_ID },
       { type: 'item', id: 'agents' },
       { type: 'item', id: CONTACTS_ID },
@@ -88,11 +103,15 @@ export const ROLES = {
     label: 'Buyer / Planner',
     segments: [
       { type: 'item', id: 'orderbank' },
+      { type: 'item', id: ATTENTION_QUEUE_ID },
+      { type: 'item', id: AGENTIC_PLAYBOOK_ID },
       { type: 'item', id: 'customer-orders' },
       { type: 'inventory', keys: ['fg', 'components'] },
       { type: 'item', id: 'suppliers' },
       { type: 'item', id: 'trade-risk' },
       { type: 'planning-group', parentId: 'planning', children: [PURCHASE_ORDERS_ID] },
+      { type: 'item', id: PRODUCTION_PLANNING_ID },
+      { type: 'item', id: SHOP_FLOOR_ID },
       { type: 'item', id: 'fulfillment' },
       { type: 'item', id: 'demand' },
       { type: 'item', id: 'agents' },
@@ -132,18 +151,23 @@ export const ROLES = {
     label: 'Management',
     segments: [
       { type: 'item', id: 'executive' },
+      { type: 'item', id: ATTENTION_QUEUE_ID },
+      { type: 'item', id: AGENTIC_PLAYBOOK_ID },
       { type: 'item', id: 'orderbank' },
       { type: 'item', id: 'customer-orders' },
       { type: 'inventory', keys: ['fg'] },
       { type: 'item', id: 'trade-risk' },
       { type: 'item', id: 'suppliers' },
       { type: 'planning-group', parentId: 'planning', children: [PURCHASE_ORDERS_ID] },
+      { type: 'item', id: PRODUCTION_PLANNING_ID },
+      { type: 'item', id: SHOP_FLOOR_ID },
       { type: 'item', id: 'fulfillment' },
       { type: 'item', id: 'demand' },
       { type: 'item', id: 'agents' },
       { type: 'item', id: CONTACTS_ID },
       { type: 'item', id: 'data-sync' },
     ],
+    // Executive Command Center stays the landing module for portfolio KPIs; Planning / Floor are one click away.
     defaultActive: 'executive',
   },
   'shop-supervisor': {
