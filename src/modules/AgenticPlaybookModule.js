@@ -2,10 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { buildPlaybookProposals } from '../utils/agenticPlaybook';
 import { getSyncHealthReadout } from '../utils/syncHealth';
+import {
+  SC_AGENTIC_PLAYBOOK_STATUS_KEY,
+  SC_AGENTIC_PLAYBOOK_CONSTRAINTS_KEY,
+  SC_AGENTIC_PLAYBOOK_AUDIT_KEY,
+} from '../constants/demoStorageKeys';
 
-const STATUS_KEY = 'sc-agentic-playbook-status';
-const CONSTRAINTS_KEY = 'sc-agentic-playbook-constraints';
-const AUDIT_KEY = 'sc-agentic-playbook-audit';
+const STATUS_KEY = SC_AGENTIC_PLAYBOOK_STATUS_KEY;
+const CONSTRAINTS_KEY = SC_AGENTIC_PLAYBOOK_CONSTRAINTS_KEY;
+const AUDIT_KEY = SC_AGENTIC_PLAYBOOK_AUDIT_KEY;
 const AUDIT_ACTOR = 'User';
 
 function loadJson(key, fallback) {

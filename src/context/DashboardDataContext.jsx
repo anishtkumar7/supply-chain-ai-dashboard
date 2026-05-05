@@ -2,12 +2,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
 import {
   skuData as initSku,
   componentData as initComponent,
+  classBCData as initClassBc,
   supplierData as initSupplier,
   shipmentData as initShipment,
   orderHistory as initOrderHistory,
@@ -15,18 +17,66 @@ import {
   agentAlerts as initAgentAlerts,
   contactDirectory as initContactDirectory,
 } from '../data/sampleData';
+import { RIVIT_ADJUSTMENTS_KEY } from '../constants/demoStorageKeys';
+import { buildPartsMovementSeedHistory } from '../data/partsMovementHistorySeed';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-function buildInitialAdjustmentHistory() {
-  const daysAgo = (n) => new Date(Date.now() - n * 86400000);
-  return [
-    { id: 'H1', timeLabel: '3 days ago', at: daysAgo(3), part: 'CMP-WRH-004', description: 'Wiring Harness', type: 'Write Off', quantity: 12, reason: 'Scrapped — defect', authorizedBy: 'J. Martinez', flagged: true },
-    { id: 'H2', timeLabel: '5 days ago', at: daysAgo(5), part: 'FG-T800-CL', description: 'Class 8 Highway Tractor', type: 'Transfer', quantity: 8, reason: 'Line 1 to Warehouse A', authorizedBy: 'S. Patel', flagged: false },
-    { id: 'H3', timeLabel: '7 days ago', at: daysAgo(7), part: 'CMP-ENG-001', description: 'Diesel Engine Assembly', type: 'Write On', quantity: 5, reason: 'Found in warehouse', authorizedBy: 'T. Williams', flagged: false },
-    { id: 'H4', timeLabel: '10 days ago', at: daysAgo(10), part: 'CMP-BAT-009', description: 'EV Battery Pack', type: 'Write Off', quantity: 3, reason: 'Damage', authorizedBy: 'R. Chen', flagged: false },
-    { id: 'H5', timeLabel: '14 days ago', at: daysAgo(14), part: 'FG-R450-CO', description: 'Regional Cab-Over Truck', type: 'Write Off', quantity: 15, reason: 'Obsolete', authorizedBy: 'K. Johnson', flagged: true },
-  ];
+/** Frozen snapshots for computing inventory patches vs sample data */
+const INIT_SKU_SNAPSHOT = clone(initSku);
+const INIT_COMP_SNAPSHOT = clone(initComponent);
+const INIT_CLASS_BC_SNAPSHOT = clone(initClassBc);
+
+function applyClassBcPatches(baseRows, patches) {
+  const withExt = (row, onHand) => ({
+    ...row,
+    onHand,
+    extended: onHand * row.unitCost,
+  });
+  if (!patches || typeof patches !== 'object') {
+    return baseRows.map((row) => withExt(row, row.onHand));
+  }
+  return baseRows.map((row) => {
+    const p = patches[row.sku];
+    if (!p) return withExt(row, row.onHand);
+    const nextOn = p.onHand != null ? p.onHand : row.onHand;
+    return withExt({ ...row, ...p }, nextOn);
+  });
+}
+
+function readRivitAdjustmentsPayload() {
+  try {
+    const raw = window.localStorage.getItem(RIVIT_ADJUSTMENTS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return p && typeof p === 'object' ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+function applySkuPatches(baseRows, patches) {
+  if (!patches || typeof patches !== 'object') return baseRows;
+  return baseRows.map((row) => {
+    const p = patches[row.sku];
+    return p ? { ...row, ...p } : row;
+  });
+}
+
+function applyComponentPatches(baseRows, patches) {
+  if (!patches || typeof patches !== 'object') return baseRows;
+  return baseRows.map((row) => {
+    const p = patches[row.sku];
+    return p ? { ...row, ...p } : row;
+  });
+}
+
+function reviveAdjustmentHistory(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((h) => ({
+    ...h,
+    at: h.at ? new Date(h.at) : new Date(),
+  }));
 }
 
 const DashboardDataContext = createContext(null);
@@ -50,8 +100,17 @@ export const MODULE_IDS = {
 };
 
 export function DashboardDataProvider({ children }) {
-  const [skuData, setSkuData] = useState(() => clone(initSku));
-  const [componentData, setComponentData] = useState(() => clone(initComponent));
+  const adjPayload = readRivitAdjustmentsPayload();
+
+  const [skuData, setSkuData] = useState(() =>
+    applySkuPatches(clone(initSku), adjPayload?.skuPatches)
+  );
+  const [componentData, setComponentData] = useState(() =>
+    applyComponentPatches(clone(initComponent), adjPayload?.componentPatches)
+  );
+  const [classBcPartsData, setClassBcPartsData] = useState(() =>
+    applyClassBcPatches(clone(initClassBc), adjPayload?.classBcPatches)
+  );
   const [supplierData, setSupplierData] = useState(() => clone(initSupplier));
   const [shipmentData, setShipmentData] = useState(() => clone(initShipment));
   const [orderHistory, setOrderHistory] = useState(() => clone(initOrderHistory));
@@ -59,7 +118,11 @@ export function DashboardDataProvider({ children }) {
   const [agentAlerts, setAgentAlerts] = useState(() => clone(initAgentAlerts));
   const [contactDirectory] = useState(() => clone(initContactDirectory));
   const [dirtyModules, setDirtyModules] = useState(() => new Set());
-  const [adjustmentHistory, setAdjustmentHistory] = useState(() => buildInitialAdjustmentHistory());
+  const [adjustmentHistory, setAdjustmentHistory] = useState(() =>
+    adjPayload?.adjustmentHistory?.length
+      ? reviveAdjustmentHistory(adjPayload.adjustmentHistory)
+      : buildPartsMovementSeedHistory()
+  );
   const [lastManualUpload, setLastManualUpload] = useState({
     message: 'Using sample data',
     isSample: true,
@@ -165,12 +228,59 @@ export function DashboardDataProvider({ children }) {
     ]);
   }, []);
 
+  useEffect(() => {
+    const skuPatches = {};
+    skuData.forEach((row) => {
+      const init = INIT_SKU_SNAPSHOT.find((x) => x.sku === row.sku);
+      if (!init) return;
+      if (row.onHand !== init.onHand || row.available !== init.available) {
+        skuPatches[row.sku] = { onHand: row.onHand, available: row.available };
+      }
+    });
+    const componentPatches = {};
+    componentData.forEach((row) => {
+      const init = INIT_COMP_SNAPSHOT.find((x) => x.sku === row.sku);
+      if (!init) return;
+      if (row.onHand !== init.onHand || row.extended !== init.extended) {
+        componentPatches[row.sku] = { onHand: row.onHand, extended: row.extended };
+      }
+    });
+    const classBcPatches = {};
+    classBcPartsData.forEach((row) => {
+      const init = INIT_CLASS_BC_SNAPSHOT.find((x) => x.sku === row.sku);
+      if (!init) return;
+      const nextExt = row.onHand * row.unitCost;
+      if (row.onHand !== init.onHand || nextExt !== init.onHand * init.unitCost) {
+        classBcPatches[row.sku] = { onHand: row.onHand, extended: nextExt };
+      }
+    });
+    const adjustmentPayload = adjustmentHistory.map((h) => ({
+      ...h,
+      at: h.at instanceof Date ? h.at.toISOString() : h.at,
+    }));
+    try {
+      window.localStorage.setItem(
+        RIVIT_ADJUSTMENTS_KEY,
+        JSON.stringify({
+          skuPatches,
+          componentPatches,
+          classBcPatches,
+          adjustmentHistory: adjustmentPayload,
+        })
+      );
+    } catch {
+      /* ignore quota */
+    }
+  }, [skuData, componentData, classBcPartsData, adjustmentHistory]);
+
   const value = useMemo(
     () => ({
       skuData,
       setSkuData,
       componentData,
       setComponentData,
+      classBcPartsData,
+      setClassBcPartsData,
       supplierData,
       setSupplierData,
       shipmentData,
@@ -199,6 +309,7 @@ export function DashboardDataProvider({ children }) {
     [
       skuData,
       componentData,
+      classBcPartsData,
       supplierData,
       shipmentData,
       orderHistory,

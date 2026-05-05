@@ -549,6 +549,30 @@
   box-shadow: 0 0 12px rgba(0, 212, 255, 0.55);
 }
 
+/* Primary “Take action” style — white surface (replaces cyan inset strip on CTAs only) */
+.nav-btn.nav-btn--take-action {
+  justify-content: center;
+  text-align: center;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.nav-btn.nav-btn--take-action:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.nav-btn.nav-btn--take-action--risk {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.nav-btn.nav-btn--take-action--risk:hover {
+  background: #fef2f2;
+}
+
 .nav-btn__text {
   white-space: nowrap;
   overflow: hidden;
@@ -1467,6 +1491,48 @@ button.tag--switch:hover,
 
 .parts-inv__match-btn:hover {
   background: rgba(34, 197, 94, 0.08);
+}
+
+.parts-inv__match-btn-badge {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+}
+
+.parts-inv__abc {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.parts-inv__abc--a {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.45);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.parts-inv__abc--b {
+  color: #fef08a;
+  background: rgba(113, 63, 18, 0.5);
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.parts-inv__abc--c {
+  color: #cbd5e1;
+  background: rgba(51, 65, 85, 0.65);
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.parts-inv__abc--fg {
+  color: #bae6fd;
+  background: rgba(12, 74, 110, 0.55);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 a.link-blueprint,
@@ -2392,6 +2458,29 @@ a.link-blueprint:hover,
 
 .nav-btn--active .nav-btn__dot {
   background: rgba(0, 212, 255, 0.55);
+}
+
+.nav-btn.nav-btn--take-action {
+  justify-content: center;
+  text-align: center;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  font-weight: 600;
+}
+
+.nav-btn.nav-btn--take-action:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.nav-btn.nav-btn--take-action--risk {
+  border-color: rgba(248, 113, 113, 0.55) !important;
+}
+
+.nav-btn.nav-btn--take-action--risk:hover {
+  background: #fef2f2 !important;
 }
 
 .sidebar__collapse,

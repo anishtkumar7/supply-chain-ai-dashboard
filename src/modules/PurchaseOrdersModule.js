@@ -15,6 +15,7 @@ import { useDashboardData } from '../context/DashboardDataContext';
 import { useExportRegistration } from '../context/ExportRegistrationContext';
 import { PURCHASE_ORDERS_ID } from '../config/roleNavConfig';
 import { purchaseOrderTrackerRows } from '../utils/exportUtils';
+import { RIVIT_POS_KEY } from '../constants/demoStorageKeys';
 
 const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const SHORT_CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
@@ -152,6 +153,24 @@ function statusBadge(status) {
   );
 }
 
+function mergePurchaseOrders(sample, savedList) {
+  if (!savedList || !Array.isArray(savedList)) return [...sample];
+  const map = new Map();
+  sample.forEach((p) => map.set(p.poNumber, { ...p }));
+  savedList.forEach((po) => map.set(po.poNumber, po));
+  return [...map.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+function loadMergedPurchaseOrders() {
+  try {
+    const raw = window.localStorage.getItem(RIVIT_POS_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    return mergePurchaseOrders(INITIAL_POS, saved);
+  } catch {
+    return [...INITIAL_POS];
+  }
+}
+
 function createDraftEmail(po, componentDescription) {
   return [
     `Subject: Purchase Order ${po.poNumber} — Vectrum Manufacturing`,
@@ -192,7 +211,7 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
   );
 
   const [dismissedSuggestions, setDismissedSuggestions] = useState([]);
-  const [openPos, setOpenPos] = useState(INITIAL_POS);
+  const [openPos, setOpenPos] = useState(loadMergedPurchaseOrders);
   const [toast, setToast] = useState('');
   const [viewModalPo, setViewModalPo] = useState(null);
   const [poTrackerSearch, setPoTrackerSearch] = useState('');
@@ -313,6 +332,14 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
     () => purchaseOrderTrackerRows(filteredTrackerRows, componentBySku),
     [filteredTrackerRows, componentBySku]
   );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RIVIT_POS_KEY, JSON.stringify(openPos));
+    } catch {
+      /* ignore */
+    }
+  }, [openPos]);
 
   useExportRegistration(PURCHASE_ORDERS_ID, () => ({
     rows: poExportRows,

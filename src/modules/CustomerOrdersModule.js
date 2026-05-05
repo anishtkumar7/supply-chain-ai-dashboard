@@ -132,7 +132,7 @@ export function CustomerOrdersModule({ onComposeEmail }) {
                   </td>
                   <td>{o.reason}</td>
                   <td>
-                    <button type="button" className="nav-btn nav-btn--active" onClick={() => setActiveOrder(o.id)}>
+                    <button type="button" className="nav-btn nav-btn--take-action" onClick={() => setActiveOrder(o.id)}>
                       Take Action
                     </button>
                   </td>

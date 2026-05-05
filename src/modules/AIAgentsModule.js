@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { daysCoverFromWks } from '../utils/coverageDisplay';
+import { RIVIT_DISMISSED_AGENT_ALERTS_KEY } from '../constants/demoStorageKeys';
 
 const PLANNER_ESCALATIONS_KEY = 'sc-planner-escalations';
+
+function loadDismissedAlertIds() {
+  try {
+    const raw = window.localStorage.getItem(RIVIT_DISMISSED_AGENT_ALERTS_KEY);
+    const ids = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(ids)) return {};
+    return Object.fromEntries(ids.filter(Boolean).map((id) => [id, true]));
+  } catch {
+    return {};
+  }
+}
 
 function minutesAgoLabel(nowMs, runAtMs) {
   const mins = Math.max(0, Math.floor((nowMs - runAtMs) / 60000));
@@ -24,7 +36,7 @@ function severityPillClass(severity) {
 export function AIAgentsModule({ onComposeEmail }) {
   const { skuData, shipmentData, supplierData, componentData, customerOrderData, contactDirectory } = useDashboardData();
   const [nowMs, setNowMs] = useState(Date.now());
-  const [dismissed, setDismissed] = useState({});
+  const [dismissed, setDismissed] = useState(loadDismissedAlertIds);
   const [actions, setActions] = useState({});
   const [openMenuId, setOpenMenuId] = useState(null);
   const [toast, setToast] = useState(null);
@@ -41,6 +53,15 @@ export function AIAgentsModule({ onComposeEmail }) {
     const t = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    try {
+      const ids = Object.keys(dismissed).filter((id) => dismissed[id]);
+      window.localStorage.setItem(RIVIT_DISMISSED_AGENT_ALERTS_KEY, JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
+  }, [dismissed]);
 
   useEffect(() => {
     const loadEscalations = () => {
@@ -289,7 +310,7 @@ export function AIAgentsModule({ onComposeEmail }) {
               </button>
               <button
                 type="button"
-                className="nav-btn nav-btn--active"
+                className="nav-btn nav-btn--take-action"
                 onClick={() => setOpenMenuId((prev) => (prev === agent.id ? null : agent.id))}
               >
                 Take Action

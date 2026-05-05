@@ -22,6 +22,7 @@ import {
   forecastRows,
   exportSheet,
 } from '../utils/exportUtils';
+import { clearDemoLocalStorage } from '../constants/demoStorageKeys';
 
 const SERVICE_ACCOUNT = 'vectrum-sync@rivit.iam.gserviceaccount.com';
 
@@ -618,6 +619,18 @@ export function DataSyncModule() {
     }, 2000);
   };
 
+  const onResetDemoData = () => {
+    if (
+      !window.confirm(
+        'Reset all saved demo data for this browser? This clears local inventory/PO/playbook/saved settings and reloads the page.'
+      )
+    ) {
+      return;
+    }
+    clearDemoLocalStorage();
+    window.location.reload();
+  };
+
   const onGsSync = () => {
     setGsSyncMsg('');
     setGPct(0);
@@ -646,6 +659,21 @@ export function DataSyncModule() {
         <strong>Sample data notice:</strong> Currently showing sample data for Vectrum Manufacturing. Upload your data or
         connect your ERP to see your real operations in RIVIT.
       </div>
+
+      <section className="panel" style={{ marginBottom: 20 }}>
+        <div className="panel__head">
+          <div>
+            <div className="panel__title">Demo session</div>
+            <p className="panel__meta" style={{ margin: 0 }}>
+              Parts adjustments, purchase orders, playbook actions, agent dismissals, and display density are saved in this
+              browser (localStorage). Use reset between demos to return to sample data.
+            </p>
+          </div>
+        </div>
+        <button type="button" className="btn btn--danger" onClick={onResetDemoData}>
+          Reset demo data
+        </button>
+      </section>
 
       <section className="panel" style={{ marginBottom: 20 }}>
         <div className="panel__head">

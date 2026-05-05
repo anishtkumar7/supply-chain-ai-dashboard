@@ -1,3 +1,5 @@
+import { buildPartMovementHistory } from './partMovementHistoryBuilder';
+
 export const skuData = [
   {
     sku: 'FG-T800-CL',
@@ -128,17 +130,84 @@ export const skuData = [
 ];
 
 export const componentData = [
-  { sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly 13L', drivesFG: 'FG-T800-CL', supplier: 'Detroit Power Systems', supplierID: 'SUP-441', country: 'USA', onHand: 412, unitCost: 28400, extended: 11700800, daysSupply: 31, health: 'HEALTHY', reorderDate: '2026-05-14', moq: 50, eoq: 200, netNeed: 180, tariffRate: 0 },
-  { sku: 'CMP-AXL-002', description: 'Drive Axle Assembly HD', drivesFG: 'FG-V900-HD', supplier: 'Stuttgart Drive Systems', supplierID: 'SUP-664', country: 'Germany', onHand: 1100, unitCost: 8640, extended: 9504000, daysSupply: 24, health: 'WATCH', reorderDate: '2026-04-24', moq: 800, eoq: 2400, netNeed: 1900, tariffRate: 10 },
-  { sku: 'CMP-TCM-003', description: 'Transmission Control Module', drivesFG: 'FG-M550-MD', supplier: 'Penang PCB Assembly', supplierID: 'SUP-119', country: 'Malaysia', onHand: 8400, unitCost: 142, extended: 1192800, daysSupply: 31, health: 'HEALTHY', reorderDate: '2026-05-28', moq: 5000, eoq: 12000, netNeed: 5600, tariffRate: 24 },
-  { sku: 'CMP-WRH-004', description: 'Wiring Harness Complete', drivesFG: 'FG-R450-CO', supplier: 'Chennai Cable & Harness', supplierID: 'SUP-551', country: 'India', onHand: 900, unitCost: 1180, extended: 1062000, daysSupply: 11, health: 'CRITICAL', reorderDate: '2026-04-21', moq: 2000, eoq: 8000, netNeed: 6200, tariffRate: 26 },
-  { sku: 'CMP-STL-005', description: 'Steel Cab Stamping', drivesFG: 'FG-C100-CA', supplier: 'Monterrey Metal Forming', supplierID: 'SUP-773', country: 'Mexico', onHand: 38000, unitCost: 18.6, extended: 706800, daysSupply: 44, health: 'HEALTHY', reorderDate: '2026-05-02', moq: 15000, eoq: 45000, netNeed: 12000, tariffRate: 0 },
-  { sku: 'CMP-INV-006', description: 'Power Inverter Stack EV', drivesFG: 'FG-E300-EV', supplier: 'Shenzhen Precision Components', supplierID: 'SUP-981', country: 'China', onHand: 620, unitCost: 2240, extended: 1388800, daysSupply: 18, health: 'WATCH', reorderDate: '2026-04-28', moq: 500, eoq: 2000, netNeed: 1400, tariffRate: 145 },
-  { sku: 'CMP-ECU-007', description: 'Safety ECU Module', drivesFG: 'FG-S200-SV', supplier: 'Penang PCB Assembly', supplierID: 'SUP-119', country: 'Malaysia', onHand: 4100, unitCost: 96, extended: 393600, daysSupply: 29, health: 'HEALTHY', reorderDate: '2026-05-15', moq: 4000, eoq: 16000, netNeed: 4800, tariffRate: 24 },
-  { sku: 'CMP-HYD-008', description: 'Hydraulic Pump Assembly', drivesFG: 'FG-V900-HD', supplier: 'Rotterdam Industrial Supply', supplierID: 'SUP-228', country: 'Netherlands', onHand: 2200, unitCost: 3400, extended: 7480000, daysSupply: 35, health: 'HEALTHY', reorderDate: '2026-05-20', moq: 1000, eoq: 4000, netNeed: 2800, tariffRate: 10 },
-  { sku: 'CMP-BAT-009', description: 'EV Battery Pack 320kWh', drivesFG: 'FG-E300-EV', supplier: 'Shenzhen Precision Components', supplierID: 'SUP-981', country: 'China', onHand: 280, unitCost: 41200, extended: 11536000, daysSupply: 14, health: 'WATCH', reorderDate: '2026-04-26', moq: 100, eoq: 400, netNeed: 380, tariffRate: 145 },
-  { sku: 'CMP-CAB-010', description: 'Cab Glass & Sealing Kit', drivesFG: 'FG-C100-CA', supplier: 'Ho Chi Minh Plastics Works', supplierID: 'SUP-412', country: 'Vietnam', onHand: 3200, unitCost: 280, extended: 896000, daysSupply: 22, health: 'HEALTHY', reorderDate: '2026-05-10', moq: 2000, eoq: 8000, netNeed: 3400, tariffRate: 46 },
+  { sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly 13L', drivesFG: 'FG-T800-CL', supplier: 'Detroit Power Systems', supplierID: 'SUP-441', country: 'USA', onHand: 412, unitCost: 28400, extended: 11700800, daysSupply: 31, health: 'HEALTHY', reorderDate: '2026-05-14', moq: 50, eoq: 200, netNeed: 180, tariffRate: 0, inventoryClass: 'A' },
+  { sku: 'CMP-AXL-002', description: 'Drive Axle Assembly HD', drivesFG: 'FG-V900-HD', supplier: 'Stuttgart Drive Systems', supplierID: 'SUP-664', country: 'Germany', onHand: 1100, unitCost: 8640, extended: 9504000, daysSupply: 24, health: 'WATCH', reorderDate: '2026-04-24', moq: 800, eoq: 2400, netNeed: 1900, tariffRate: 10, inventoryClass: 'A' },
+  { sku: 'CMP-TCM-003', description: 'Transmission Control Module', drivesFG: 'FG-M550-MD', supplier: 'Penang PCB Assembly', supplierID: 'SUP-119', country: 'Malaysia', onHand: 8400, unitCost: 142, extended: 1192800, daysSupply: 31, health: 'HEALTHY', reorderDate: '2026-05-28', moq: 5000, eoq: 12000, netNeed: 5600, tariffRate: 24, inventoryClass: 'A' },
+  { sku: 'CMP-WRH-004', description: 'Wiring Harness Complete', drivesFG: 'FG-R450-CO', supplier: 'Chennai Cable & Harness', supplierID: 'SUP-551', country: 'India', onHand: 900, unitCost: 1180, extended: 1062000, daysSupply: 11, health: 'CRITICAL', reorderDate: '2026-04-21', moq: 2000, eoq: 8000, netNeed: 6200, tariffRate: 26, inventoryClass: 'A' },
+  { sku: 'CMP-STL-005', description: 'Steel Cab Stamping', drivesFG: 'FG-C100-CA', supplier: 'Monterrey Metal Forming', supplierID: 'SUP-773', country: 'Mexico', onHand: 38000, unitCost: 18.6, extended: 706800, daysSupply: 44, health: 'HEALTHY', reorderDate: '2026-05-02', moq: 15000, eoq: 45000, netNeed: 12000, tariffRate: 0, inventoryClass: 'A' },
+  { sku: 'CMP-INV-006', description: 'Power Inverter Stack EV', drivesFG: 'FG-E300-EV', supplier: 'Shenzhen Precision Components', supplierID: 'SUP-981', country: 'China', onHand: 620, unitCost: 2240, extended: 1388800, daysSupply: 18, health: 'WATCH', reorderDate: '2026-04-28', moq: 500, eoq: 2000, netNeed: 1400, tariffRate: 145, inventoryClass: 'A' },
+  { sku: 'CMP-ECU-007', description: 'Safety ECU Module', drivesFG: 'FG-S200-SV', supplier: 'Penang PCB Assembly', supplierID: 'SUP-119', country: 'Malaysia', onHand: 4100, unitCost: 96, extended: 393600, daysSupply: 29, health: 'HEALTHY', reorderDate: '2026-05-15', moq: 4000, eoq: 16000, netNeed: 4800, tariffRate: 24, inventoryClass: 'A' },
+  { sku: 'CMP-HYD-008', description: 'Hydraulic Pump Assembly', drivesFG: 'FG-V900-HD', supplier: 'Rotterdam Industrial Supply', supplierID: 'SUP-228', country: 'Netherlands', onHand: 2200, unitCost: 3400, extended: 7480000, daysSupply: 35, health: 'HEALTHY', reorderDate: '2026-05-20', moq: 1000, eoq: 4000, netNeed: 2800, tariffRate: 10, inventoryClass: 'A' },
+  { sku: 'CMP-BAT-009', description: 'EV Battery Pack 320kWh', drivesFG: 'FG-E300-EV', supplier: 'Shenzhen Precision Components', supplierID: 'SUP-981', country: 'China', onHand: 280, unitCost: 41200, extended: 11536000, daysSupply: 14, health: 'WATCH', reorderDate: '2026-04-26', moq: 100, eoq: 400, netNeed: 380, tariffRate: 145, inventoryClass: 'A' },
+  { sku: 'CMP-CAB-010', description: 'Cab Glass & Sealing Kit', drivesFG: 'FG-C100-CA', supplier: 'Ho Chi Minh Plastics Works', supplierID: 'SUP-412', country: 'Vietnam', onHand: 3200, unitCost: 280, extended: 896000, daysSupply: 22, health: 'HEALTHY', reorderDate: '2026-05-10', moq: 2000, eoq: 8000, netNeed: 3400, tariffRate: 46, inventoryClass: 'A' },
 ];
+
+/** Class B / C catalog (consumables & secondary components) — Parts Inventory search + adjustments */
+export const classBCData = [
+  {
+    sku: 'CMP-HYD-SLK',
+    description: 'Hydraulic Seal Kit — HD Cylinder',
+    inventoryClass: 'B',
+    onHand: 145,
+    unitCost: 284,
+    extended: 41180,
+    daysSupply: 38,
+    location: 'Component Warehouse',
+    drivesFG: null,
+  },
+  { sku: 'CMP-AIR-FLT', description: 'Air Filter Assembly — Primary', inventoryClass: 'B', onHand: 89, unitCost: 156, extended: 13884, daysSupply: 44, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-ALT-BLT', description: 'Alternator Drive Belt', inventoryClass: 'B', onHand: 312, unitCost: 48, extended: 14976, daysSupply: 62, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-BRK-CAL', description: 'Brake Caliper — Front Axle', inventoryClass: 'B', onHand: 67, unitCost: 425, extended: 28475, daysSupply: 29, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-FUL-CON', description: 'Fuel Line Connector — 3/8 Push Fit', inventoryClass: 'B', onHand: 234, unitCost: 32, extended: 7488, daysSupply: 55, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-DOR-HNG', description: 'Door Hinge — Cab Upper', inventoryClass: 'B', onHand: 178, unitCost: 89, extended: 15842, daysSupply: 41, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-MIR-BKT', description: 'Mirror Mounting Bracket — West Coast', inventoryClass: 'B', onHand: 445, unitCost: 28, extended: 12460, daysSupply: 67, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-EXH-CLM', description: 'Exhaust V-Band Clamp — 4 inch', inventoryClass: 'B', onHand: 892, unitCost: 14, extended: 12488, daysSupply: 71, location: 'Receiving Dock', drivesFG: null },
+  { sku: 'CMP-COL-HOS', description: 'Coolant Hose — Upper Radiator', inventoryClass: 'B', onHand: 156, unitCost: 67, extended: 10452, daysSupply: 33, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-LED-WRK', description: 'LED Work Light — 6 inch Flood', inventoryClass: 'B', onHand: 203, unitCost: 112, extended: 22736, daysSupply: 48, location: 'Component Warehouse', drivesFG: null },
+
+  /* Class C — heavy truck fastener & consumables catalog */
+  { sku: 'CMP-M6-HXB', description: 'M6 x 16mm Hex Bolt Grade 8.8', inventoryClass: 'C', onHand: 12405, unitCost: 0.06, extended: 744.3, daysSupply: 92, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M8-HXB', description: 'M8 x 25mm Hex Bolt Grade 8.8', inventoryClass: 'C', onHand: 8900, unitCost: 0.08, extended: 712, daysSupply: 88, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M10-HXB', description: 'M10 x 30mm Hex Bolt Grade 10.9', inventoryClass: 'C', onHand: 6200, unitCost: 0.12, extended: 744, daysSupply: 84, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M12-HXB', description: 'M12 x 40mm Hex Bolt Grade 10.9', inventoryClass: 'C', onHand: 4800, unitCost: 0.18, extended: 864, daysSupply: 79, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-M14-HXB', description: 'M14 x 50mm Hex Bolt Grade 10.9', inventoryClass: 'C', onHand: 3200, unitCost: 0.24, extended: 768, daysSupply: 74, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-SHC-M6', description: 'M6 x 20mm Socket Head Cap Screw', inventoryClass: 'C', onHand: 7600, unitCost: 0.11, extended: 836, daysSupply: 86, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-SHC-M8', description: 'M8 x 25mm Socket Head Cap Screw', inventoryClass: 'C', onHand: 5400, unitCost: 0.16, extended: 864, daysSupply: 81, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-STP-M5', description: 'M5 x 16mm Self-Tapping Screw', inventoryClass: 'C', onHand: 9800, unitCost: 0.07, extended: 686, daysSupply: 95, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-STP-M6', description: 'M6 x 20mm Self-Tapping Screw', inventoryClass: 'C', onHand: 7200, unitCost: 0.09, extended: 648, daysSupply: 89, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-M6-HXN', description: 'M6 Hex Nut Grade 8', inventoryClass: 'C', onHand: 14200, unitCost: 0.04, extended: 568, daysSupply: 96, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M8-HXN', description: 'M8 Hex Nut Grade 8', inventoryClass: 'C', onHand: 11600, unitCost: 0.05, extended: 580, daysSupply: 91, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M10-FLN', description: 'M10 Flange Nut Prevailing Torque', inventoryClass: 'C', onHand: 8400, unitCost: 0.08, extended: 672, daysSupply: 87, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-M12-FLN', description: 'M12 Flange Nut Prevailing Torque', inventoryClass: 'C', onHand: 6100, unitCost: 0.11, extended: 671, daysSupply: 82, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-M10-LKN', description: 'M10 Nylon Lock Nut', inventoryClass: 'C', onHand: 9200, unitCost: 0.07, extended: 644, daysSupply: 88, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-M12-LKN', description: 'M12 Nylon Lock Nut', inventoryClass: 'C', onHand: 7400, unitCost: 0.09, extended: 666, daysSupply: 84, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-WSH-M6', description: 'M6 SAE Flat Washer', inventoryClass: 'C', onHand: 18600, unitCost: 0.03, extended: 558, daysSupply: 104, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-WSH-M8', description: 'M8 SAE Flat Washer', inventoryClass: 'C', onHand: 15200, unitCost: 0.04, extended: 608, daysSupply: 98, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-WSH-M10', description: 'M10 SAE Flat Washer', inventoryClass: 'C', onHand: 12400, unitCost: 0.04, extended: 496, daysSupply: 94, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-SPR-M8', description: 'M8 Spring Lock Washer', inventoryClass: 'C', onHand: 13800, unitCost: 0.04, extended: 552, daysSupply: 97, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-SPR-M10', description: 'M10 Spring Lock Washer', inventoryClass: 'C', onHand: 10600, unitCost: 0.05, extended: 530, daysSupply: 93, location: 'Line 2 Supermarket', drivesFG: null },
+  { sku: 'CMP-RBR-GRM-12', description: 'Rubber Grommet 1/2 inch ID', inventoryClass: 'C', onHand: 5600, unitCost: 0.18, extended: 1008, daysSupply: 91, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-RBR-GRM-34', description: 'Rubber Grommet 3/4 inch ID', inventoryClass: 'C', onHand: 4200, unitCost: 0.24, extended: 1008, daysSupply: 87, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-RBR-GRM-1', description: 'Rubber Grommet 1 inch ID', inventoryClass: 'C', onHand: 3100, unitCost: 0.31, extended: 961, daysSupply: 83, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-ORM-010', description: 'O-Ring 10mm ID Nitrile', inventoryClass: 'C', onHand: 8900, unitCost: 0.12, extended: 1068, daysSupply: 96, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-ORM-020', description: 'O-Ring 20mm ID Nitrile', inventoryClass: 'C', onHand: 6700, unitCost: 0.16, extended: 1072, daysSupply: 92, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-ORM-030', description: 'O-Ring 30mm ID Nitrile', inventoryClass: 'C', onHand: 5100, unitCost: 0.21, extended: 1071, daysSupply: 88, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-CBL-20', description: 'Cable Tie 200mm UV Black', inventoryClass: 'C', onHand: 12400, unitCost: 0.12, extended: 1488, daysSupply: 88, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-CBL-30', description: 'Cable Tie 300mm UV Black', inventoryClass: 'C', onHand: 8900, unitCost: 0.16, extended: 1424, daysSupply: 84, location: 'Line 1 Supermarket', drivesFG: null },
+  { sku: 'CMP-WIR-38', description: 'Wire Loom Split Tubing 3/8 inch', inventoryClass: 'C', onHand: 3400, unitCost: 0.45, extended: 1530, daysSupply: 78, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-WIR-12', description: 'Wire Loom Split Tubing 1/2 inch', inventoryClass: 'C', onHand: 2800, unitCost: 0.58, extended: 1624, daysSupply: 74, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-HTS-12', description: 'Heat Shrink Tubing 1/2 inch Pack/25', inventoryClass: 'C', onHand: 1900, unitCost: 2.4, extended: 4560, daysSupply: 82, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-THR-LCK-L', description: 'Threadlocker Low Strength 10ml', inventoryClass: 'C', onHand: 445, unitCost: 3.2, extended: 1424, daysSupply: 84, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-THR-LCK-M', description: 'Threadlocker Medium Strength 10ml', inventoryClass: 'C', onHand: 890, unitCost: 3.4, extended: 3026, daysSupply: 84, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-THR-LCK-H', description: 'Threadlocker High Strength 10ml', inventoryClass: 'C', onHand: 560, unitCost: 3.8, extended: 2128, daysSupply: 79, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-ANT-SZE', description: 'Anti-Seize Compound Nickel 8oz', inventoryClass: 'C', onHand: 445, unitCost: 8.9, extended: 3960.5, daysSupply: 77, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-SIL-RTV', description: 'RTV Silicone Sealant Grey 3oz', inventoryClass: 'C', onHand: 334, unitCost: 6.4, extended: 2137.6, daysSupply: 81, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-PTF-TAP', description: 'PTFE Thread Seal Tape Roll', inventoryClass: 'C', onHand: 678, unitCost: 1.2, extended: 813.6, daysSupply: 94, location: 'Component Warehouse', drivesFG: null },
+  { sku: 'CMP-FOM-WTH', description: 'Foam Weatherstrip Self-Adhesive 3/8 inch', inventoryClass: 'C', onHand: 567, unitCost: 2.8, extended: 1587.6, daysSupply: 88, location: 'Receiving Dock', drivesFG: null },
+  { sku: 'CMP-SFT-PIN', description: 'Cotter Pin 3/16 x 1.5 inch', inventoryClass: 'C', onHand: 4200, unitCost: 0.08, extended: 336, daysSupply: 96, location: 'Component Warehouse', drivesFG: null },
+];
+
+export const partMovementHistory = buildPartMovementHistory(skuData, componentData, classBCData);
 
 export const supplierData = [
   { id: 'SUP-441', name: 'Detroit Power Systems', country: 'USA', category: 'Engines', leadDays: 18, otifPct: 98.4, spendUSD: 4200000, inboundStatus: 'ON TIME', risk: 'LOW', lat: 42.33, lng: -83.04, onTimeCount: 12, delayedCount: 0, stuckCount: 0, primaryContact: { name: 'Bob Hendricks', email: 'b.hendricks@detroitpowersystems.com', phone: '313-555-0201' } },

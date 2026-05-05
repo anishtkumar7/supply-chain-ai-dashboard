@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { classBCData } from '../data/sampleData';
+import { getAdjustmentRowsForSku } from '../data/partsMovementHistorySeed';
 import { daysCoverFromWks, isFgLowStockByDaysCover } from '../utils/coverageDisplay';
 
 const FG_LOCATIONS = [
@@ -36,6 +38,65 @@ const WRITE_OFF_REASONS = [
 
 const fieldFull = { width: '100%', maxWidth: '100%', marginTop: 4, display: 'block' };
 const selectBase = { width: '100%', marginTop: 4, background: 'var(--navy-900)', color: 'var(--text)', border: '1px solid var(--navy-600)', borderRadius: 6, padding: 8, fontSize: 13 };
+
+/** Write-off line in modal: up to 2 decimals when unit costs are fractional */
+const WRITE_OFF_VALUE_DISPLAY = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+function getWriteOffUnitCost(record, kind) {
+  if (kind === 'fg') return Number(record?.unitValue) || 0;
+  return Number(record?.unitCost) || 0;
+}
+
+function getPartInventoryClass(record, kind) {
+  if (kind === 'fg') return null;
+  return record?.inventoryClass || 'A';
+}
+
+/**
+ * @param {number} qty
+ * @param {number} unitCost
+ * @param {'fg' | 'comp' | 'class-bc'} kind
+ * @param {string | null} invClass  A | B | C
+ */
+function computeWriteOffPolicy(qty, unitCost, kind, invClass) {
+  const value = Math.max(0, qty) * unitCost;
+  if (kind === 'fg') {
+    return {
+      value,
+      policyFlag: true,
+      message: 'Finished goods write-off always requires management approval',
+    };
+  }
+  const cls = invClass || 'A';
+  if (cls === 'A' && value > 500) {
+    return { value, policyFlag: true, message: 'Class A write-off requires management approval' };
+  }
+  if (cls === 'B' && value > 2000) {
+    return {
+      value,
+      policyFlag: true,
+      message: 'Write-off value exceeds Class B threshold — supervisor approval required',
+    };
+  }
+  if (cls === 'C' && value > 5000) {
+    return { value, policyFlag: true, message: 'High volume write-off — approval required' };
+  }
+  return { value, policyFlag: false, message: null };
+}
+
+function SearchResultBadge({ kind, inventoryClass }) {
+  if (kind === 'fg') {
+    return <span className="parts-inv__abc parts-inv__abc--fg">FG</span>;
+  }
+  const cls = inventoryClass || 'A';
+  const tierClass = cls === 'A' ? 'parts-inv__abc--a' : cls === 'B' ? 'parts-inv__abc--b' : 'parts-inv__abc--c';
+  return <span className={`parts-inv__abc ${tierClass}`}>CLASS {cls}</span>;
+}
 
 function allocateInt(n, ratios) {
   if (n <= 0) return ratios.map(() => 0);
@@ -110,6 +171,8 @@ export function PartsInventoryModule() {
     setSkuData,
     componentData,
     setComponentData,
+    classBcPartsData,
+    setClassBcPartsData,
     markModuleDirty,
     MODULE_IDS,
     adjustmentHistory: history,
@@ -140,7 +203,7 @@ export function PartsInventoryModule() {
   const [fReason, setFReason] = useState(WRITE_OFF_REASONS[0]);
   const [fNotes, setFNotes] = useState('');
   const [fBy, setFBy] = useState('');
-  const [fFlag, setFFlag] = useState(false);
+  const [fWriteOffVoluntary, setFWriteOffVoluntary] = useState(false);
 
   const showToast = (msg) => {
     setToast({ msg, id: Date.now() });
@@ -148,53 +211,121 @@ export function PartsInventoryModule() {
   };
 
   const totalCatalogCount = useMemo(
-    () => (skuData?.length || 0) + (componentData?.length || 0),
-    [skuData, componentData]
+    () => (skuData?.length || 0) + (componentData?.length || 0) + (classBcPartsData?.length || 0),
+    [skuData, componentData, classBcPartsData]
   );
 
   const lowStockCount = useMemo(() => {
     const fg = skuData.filter((s) => isFgLowStockByDaysCover(s.wksCover)).length;
     const comp = componentData.filter((c) => c.daysSupply != null && c.daysSupply < 8).length;
-    return fg + comp;
-  }, [skuData, componentData]);
+    const bc = classBcPartsData.filter((c) => c.daysSupply != null && c.daysSupply < 8).length;
+    return fg + comp + bc;
+  }, [skuData, componentData, classBcPartsData]);
 
   const flaggedThisMonth = useMemo(
     () => history.filter((h) => h.flagged && h.at && isThisMonth(h.at instanceof Date ? h.at : new Date(h.at))).length,
     [history]
   );
 
-  const merged = useMemo(() => {
-    const matches = (text, query) => text && text.toLowerCase().includes(query);
-    if (!q.trim()) return { fg: [], comp: [] };
-    const qy = q.trim().toLowerCase();
-    return {
-      fg: skuData.filter(
-        (s) =>
-          matches(s.sku?.toLowerCase(), qy) || matches(s.product?.toLowerCase(), qy) || matches(s.family?.toLowerCase(), qy)
-      ),
-      comp: componentData.filter(
-        (c) =>
-          matches(c.sku?.toLowerCase(), qy) ||
-          matches(c.description?.toLowerCase(), qy) ||
-          matches(c.drivesFG?.toLowerCase(), qy) ||
-          matches(c.supplier?.toLowerCase(), qy)
-      ),
+  const displayedMovementHistory = useMemo(() => {
+    const sorted = [...history].sort((a, b) => new Date(b.at) - new Date(a.at));
+
+    /** Stable key when legacy rows lack `id` */
+    const rowKey = (r) =>
+      r.id ||
+      `${r.part}|${r.type}|${String(r.quantity ?? '')}|${new Date(r.at).toISOString()}|${r.reason ?? ''}`;
+
+    /** Canonical demo movements + anything saved from transfers / write-ons / write-offs (localStorage). */
+    const mergeSeedAndPersisted = (sku) => {
+      const seed = getAdjustmentRowsForSku(sku);
+      const persisted = sorted.filter((h) => h.part === sku);
+      const map = new Map();
+      for (const r of seed) map.set(rowKey(r), r);
+      for (const r of persisted) map.set(rowKey(r), r);
+      return Array.from(map.values()).sort((a, b) => new Date(b.at) - new Date(a.at));
     };
-  }, [q, skuData, componentData]);
+
+    if (selected?.sku) {
+      return mergeSeedAndPersisted(selected.sku);
+    }
+    const newestByPart = new Map();
+    for (const row of sorted) {
+      if (!newestByPart.has(row.part)) newestByPart.set(row.part, row);
+    }
+    return Array.from(newestByPart.values()).sort((a, b) => new Date(b.at) - new Date(a.at));
+  }, [history, selected]);
+
+  const merged = useMemo(() => {
+    if (!q.trim()) return { fg: [], comp: [], bc: [] };
+    const qy = q.trim().toLowerCase();
+
+    const allParts = [
+      ...skuData.map((row) => ({ kind: 'fg', row })),
+      ...componentData.map((row) => ({ kind: 'comp', row })),
+      ...classBCData.map((row) => ({ kind: 'class-bc', row })),
+    ];
+
+    const hits = allParts.filter(({ kind, row }) => {
+      const skuLower = (row.sku || '').toLowerCase();
+      const descLower =
+        kind === 'fg'
+          ? `${row.product ?? ''} ${row.family ?? ''}`.trim().toLowerCase()
+          : kind === 'comp'
+            ? `${row.description ?? ''} ${row.drivesFG ?? ''} ${row.supplier ?? ''}`.trim().toLowerCase()
+            : `${row.description ?? ''} ${row.location ?? ''} ${row.drivesFG != null ? String(row.drivesFG) : ''}`.trim().toLowerCase();
+      return skuLower.includes(qy) || descLower.includes(qy);
+    });
+
+    const fg = [];
+    const comp = [];
+    const bc = [];
+    for (const { kind, row } of hits) {
+      if (kind === 'fg') fg.push(row);
+      else if (kind === 'comp') comp.push(row);
+      else bc.push(row);
+    }
+    return { fg, comp, bc };
+  }, [q, skuData, componentData, classBCData]);
 
   const allMatches = useMemo(
     () => [
-      ...merged.fg.map((s) => ({ kind: 'fg', sku: s.sku, title: s.product, family: s.family, onHand: s.onHand })),
-      ...merged.comp.map((c) => ({ kind: 'comp', sku: c.sku, title: c.description, family: c.drivesFG || 'Component' })),
+      ...merged.fg.map((s) => ({
+        kind: 'fg',
+        sku: s.sku,
+        title: s.product,
+        family: s.family,
+        onHand: s.onHand,
+        inventoryClass: null,
+      })),
+      ...merged.comp.map((c) => ({
+        kind: 'comp',
+        sku: c.sku,
+        title: c.description,
+        family: c.drivesFG || 'Component',
+        onHand: c.onHand,
+        inventoryClass: c.inventoryClass || 'A',
+      })),
+      ...merged.bc.map((c) => {
+        const live = classBcPartsData.find((x) => x.sku === c.sku) || c;
+        return {
+          kind: 'class-bc',
+          sku: c.sku,
+          title: live.description ?? c.description,
+          family: live.drivesFG || c.drivesFG || 'Consumable / indirect',
+          onHand: live.onHand,
+          inventoryClass: live.inventoryClass ?? c.inventoryClass,
+        };
+      }),
     ],
-    [merged]
+    [merged, classBcPartsData]
   );
 
   const record = useMemo(() => {
     if (!selected) return null;
     if (selected.kind === 'fg') return skuData.find((s) => s.sku === selected.sku) || null;
+    if (selected.kind === 'class-bc') return classBcPartsData.find((c) => c.sku === selected.sku) || null;
     return componentData.find((c) => c.sku === selected.sku) || null;
-  }, [selected, skuData, componentData]);
+  }, [selected, skuData, componentData, classBcPartsData]);
 
   const pKey = selected ? partKeyFor(selected.kind, selected.sku) : null;
   const baseRows = useMemo(() => {
@@ -229,16 +360,48 @@ export function PartsInventoryModule() {
 
   const locRows = (pKey && locationOverrides[pKey]) || baseRows;
   const isFg = selected?.kind === 'fg';
+  const isClassBc = selected?.kind === 'class-bc';
   const locList = isFg ? FG_LOCATIONS : CMP_LOCATIONS;
   const description = record ? (isFg ? record.product : record.description) : '';
   const totalOnHand = record ? record.onHand : 0;
 
+  const movementHistoryTitle = useMemo(() => {
+    if (!selected?.sku || !record) return 'Recent Movements — All Parts';
+    return `Movement History — ${record.sku} ${description}`;
+  }, [selected?.sku, record, description]);
+
+  const writeOffPreviewFg = useMemo(() => {
+    const qty = Math.max(0, Math.floor(Number(fQty) || 0));
+    if (!record || !selected || selected.kind !== 'fg') return { value: 0, policyFlag: false, message: null };
+    const uc = getWriteOffUnitCost(record, 'fg');
+    return computeWriteOffPolicy(qty, uc, 'fg', null);
+  }, [fQty, record, selected]);
+
+  const writeOffPreviewNonFg = useMemo(() => {
+    const qty = Math.max(0, Math.floor(Number(fQty) || 0));
+    if (!record || !selected || selected.kind === 'fg') return { value: 0, policyFlag: false, message: null };
+    const uc = getWriteOffUnitCost(record, selected.kind);
+    const invClass = getPartInventoryClass(record, selected.kind);
+    return computeWriteOffPolicy(qty, uc, selected.kind, invClass);
+  }, [fQty, record, selected]);
+
+  const activeWriteOffPreview = selected?.kind === 'fg' ? writeOffPreviewFg : writeOffPreviewNonFg;
+  const woPol = activeWriteOffPreview;
+  const woPolicyFlag = woPol.policyFlag;
+  const woCheckedFlag = woPolicyFlag || fWriteOffVoluntary;
+
   const runTransfer = () => {
     if (!selected || !record) return;
     const qty = Math.max(0, Math.floor(Number(tfQty) || 0));
-    if (!tfFrom || !tfTo || tfFrom === tfTo || !qty) return;
+    if (!tfFrom || !tfTo || tfFrom === tfTo || !qty) {
+      if (tfFrom && tfTo && tfFrom !== tfTo && !qty) showToast('Enter a quantity greater than zero');
+      return;
+    }
     const fromRow = locRows.find((r) => r.location === tfFrom);
-    if (!fromRow || fromRow.onHand < qty) return;
+    if (!fromRow || fromRow.onHand < qty) {
+      if (fromRow) showToast(`Cannot exceed ${fromRow.onHand.toLocaleString()} units at ${tfFrom}`);
+      return;
+    }
     const next = locRows.map((r) => {
       if (r.location === tfFrom) {
         return {
@@ -268,7 +431,7 @@ export function PartsInventoryModule() {
       }),
     }));
     setTransferOpen(false);
-    showToast(`Transfer submitted — ${qty} units of ${selected.sku} from ${tfFrom} to ${tfTo}`);
+    showToast(`Transfer complete — ${qty} units of ${selected.sku} moved from ${tfFrom} to ${tfTo}`);
     addAdjustmentHistory({
       id: `T${Date.now()}`,
       part: selected.sku,
@@ -299,6 +462,14 @@ export function PartsInventoryModule() {
           s.sku === selected.sku
             ? { ...s, onHand: s.onHand + n, available: s.available + n }
             : s
+        )
+      );
+    } else if (selected.kind === 'class-bc') {
+      setClassBcPartsData((list) =>
+        list.map((c) =>
+          c.sku === selected.sku
+            ? { ...c, onHand: c.onHand + n, extended: (c.onHand + n) * c.unitCost }
+            : c
         )
       );
     } else {
@@ -345,7 +516,10 @@ export function PartsInventoryModule() {
     if (!n || !fReason) return;
     const rsn = fNotes ? `${fReason} — ${fNotes}` : fReason;
     const auth = fBy || '—';
-    const wasFlag = n > 10 || fFlag;
+    const uc = getWriteOffUnitCost(record, selected.kind);
+    const invClass = getPartInventoryClass(record, selected.kind);
+    const pol = computeWriteOffPolicy(n, uc, selected.kind, invClass);
+    const wasFlag = pol.policyFlag || fWriteOffVoluntary;
     if (selected.kind === 'fg') {
       setSkuData((list) =>
         list.map((s) => {
@@ -353,6 +527,14 @@ export function PartsInventoryModule() {
           const nextOn = Math.max(0, s.onHand - n);
           const av = Math.max(0, nextOn - s.committed);
           return { ...s, onHand: nextOn, available: av };
+        })
+      );
+    } else if (selected.kind === 'class-bc') {
+      setClassBcPartsData((list) =>
+        list.map((c) => {
+          if (c.sku !== selected.sku) return c;
+          const nextOn = Math.max(0, c.onHand - n);
+          return { ...c, onHand: nextOn, extended: nextOn * c.unitCost };
         })
       );
     } else {
@@ -376,7 +558,7 @@ export function PartsInventoryModule() {
     setFReason(WRITE_OFF_REASONS[0]);
     setFNotes('');
     setFBy('');
-    setFFlag(false);
+    setFWriteOffVoluntary(false);
     showToast('Adjustment recorded — inventory updated');
     addAdjustmentHistory({
       id: `F${Date.now()}`,
@@ -391,18 +573,17 @@ export function PartsInventoryModule() {
     markModuleDirty(MODULE_IDS.inventoryParts);
   };
 
-  useEffect(() => {
-    const m = Math.max(0, Math.floor(Number(fQty) || 0));
-    if (m > 10) setFFlag(true);
-  }, [fQty]);
-
   const openTransfer = () => {
     if (!locList.length) return;
     setTfFrom(locList[0]);
     setTfTo(locList[1] || locList[0]);
     setTfReason('');
+    setTfQty('');
     setTransferOpen(true);
   };
+
+  const transferFromRow = transferOpen && tfFrom ? locRows.find((r) => r.location === tfFrom) : null;
+  const transferMaxXfer = transferFromRow?.onHand ?? 0;
 
   const toOptions = locList.filter((l) => l !== tfFrom);
 
@@ -420,7 +601,7 @@ export function PartsInventoryModule() {
           <div className="inv-kpi parts-inv__kpi" style={{ borderLeftColor: '#3b82f6' }}>
             <span className="inv-kpi__label">Total parts in catalog</span>
             <span className="inv-kpi__value" style={{ color: '#3b82f6' }}>{totalCatalogCount}</span>
-            <span className="inv-kpi__hint">FG + component SKUs (live data)</span>
+            <span className="inv-kpi__hint">FG + component + Class B/C SKUs (live data)</span>
           </div>
           <div className="inv-kpi parts-inv__kpi" style={{ borderLeftColor: '#f59e0b' }}>
             <span className="inv-kpi__label">Flagged adjustments this month</span>
@@ -465,7 +646,9 @@ export function PartsInventoryModule() {
                 >
                   <span className="mono">{m.sku}</span>
                   <span>{m.title}</span>
-                  <span className="panel__meta" style={{ marginLeft: 8 }}>{m.kind === 'fg' ? 'FG' : 'Component'}</span>
+                  <span className="parts-inv__match-btn-badge">
+                    <SearchResultBadge kind={m.kind} inventoryClass={m.inventoryClass} />
+                  </span>
                 </button>
               </li>
             ))}
@@ -485,13 +668,23 @@ export function PartsInventoryModule() {
           <h2 className="parts-inv__h2" style={{ margin: '0 0 0.4rem' }}>Part details</h2>
           <div className="parts-inv__head-row">
             <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                <SearchResultBadge kind={selected.kind} inventoryClass={isFg ? null : record.inventoryClass || 'A'} />
+              </div>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.06, color: 'var(--muted)', margin: 0 }}>Part number & description</p>
               <p style={{ margin: 4, fontSize: 18, fontWeight: 700, color: '#f8fafc' }}>
                 <span className="mono">{record.sku}</span>
                 <span style={{ color: 'var(--muted)', fontWeight: 500, margin: '0 0.4rem' }}>—</span>
                 {description}
               </p>
-              <p className="panel__meta" style={{ margin: '0.2rem 0' }}>Product family: {isFg ? record.family : `Component · drives ${record.drivesFG || 'n/a'}`}</p>
+              <p className="panel__meta" style={{ margin: '0.2rem 0' }}>
+                Product family:{' '}
+                {isFg
+                  ? record.family
+                  : isClassBc
+                    ? `Class ${record.inventoryClass} · ${record.location}${record.drivesFG ? ` · drives ${record.drivesFG}` : ''}`
+                    : `Component · drives ${record.drivesFG || 'n/a'}`}
+              </p>
               {isFg && record.wksCover != null && (
                 <p className="panel__meta" style={{ margin: '0.2rem 0' }}>
                   Days cover (rounded): {daysCoverFromWks(record.wksCover)}
@@ -533,16 +726,34 @@ export function PartsInventoryModule() {
             </table>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <button type="button" onClick={openTransfer} className="nav-group__header" style={{ width: 'auto' }}>Transfer stock</button>
-            <div style={{ display: 'inline-flex', gap: 8 }}>
-              <button type="button" onClick={() => { setWReason(WRITE_ON_REASONS[0]); setWQty(''); setWriteOnOpen(true); setReviewBanner(false); }}>Write on</button>
-              <button
-                type="button"
-                onClick={() => { setFReason(WRITE_OFF_REASONS[0]); setFQty(''); setFFlag(false); setWriteOffOpen(true); setReviewBanner(false); }}
-                style={{ border: '1px solid rgba(248, 113, 113, 0.45)' }}
-              >Write off
-              </button>
-            </div>
+            <button type="button" className="nav-btn nav-btn--take-action" onClick={openTransfer}>
+              Transfer
+            </button>
+            <button
+              type="button"
+              className="nav-btn nav-btn--take-action"
+              onClick={() => {
+                setWReason(WRITE_ON_REASONS[0]);
+                setWQty('');
+                setWriteOnOpen(true);
+                setReviewBanner(false);
+              }}
+            >
+              Write on
+            </button>
+            <button
+              type="button"
+              className="nav-btn nav-btn--take-action nav-btn--take-action--risk"
+              onClick={() => {
+                setFReason(WRITE_OFF_REASONS[0]);
+                setFQty('');
+                setFWriteOffVoluntary(false);
+                setWriteOffOpen(true);
+                setReviewBanner(false);
+              }}
+            >
+              Write off
+            </button>
           </div>
         </section>
       )}
@@ -557,29 +768,47 @@ export function PartsInventoryModule() {
         <div className="modal-backdrop" onClick={() => setTransferOpen(false)} role="presentation" style={{ zIndex: 1500 }}>
           <div className="modal-card" style={{ maxWidth: 440, width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <h3>Transfer stock</h3>
-            <p className="panel__meta" style={{ margin: '0.2rem 0' }}>Part: <span className="mono">{record.sku}</span> — {description}</p>
+            <p className="panel__meta" style={{ margin: '0.2rem 0' }}>
+              Part number: <span className="mono" style={{ fontWeight: 600 }}>{record.sku}</span> <span style={{ color: 'var(--muted)' }}>(read only)</span>
+            </p>
+            <p className="panel__meta" style={{ margin: '0.2rem 0' }}>
+              Description: <span style={{ fontWeight: 600 }}>{description}</span> <span style={{ color: 'var(--muted)' }}>(read only)</span>
+            </p>
+            <p className="panel__meta" style={{ margin: '0.35rem 0', fontWeight: 600, color: '#e2e8f0' }}>
+              Current total quantity (read only): {totalOnHand.toLocaleString()}
+            </p>
             <div style={{ margin: '0.5rem 0' }}>
-              <div className="panel__meta">From</div>
+              <div className="panel__meta">Transfer From</div>
               <select value={tfFrom} onChange={(e) => setTfFrom(e.target.value)} style={selectBase}>
                 {locList.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div style={{ margin: '0.5rem 0' }}>
-              <div className="panel__meta">To</div>
+              <div className="panel__meta">Transfer To</div>
               <select value={tfTo} onChange={(e) => setTfTo(e.target.value)} style={selectBase}>
                 {toOptions.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
-            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Quantity
-              <input value={tfQty} onChange={(e) => setTfQty(e.target.value)} type="number" min="0" className="globe-search" style={{ width: '100%', maxWidth: '100%', marginTop: 4 }} />
+            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+              Quantity to Transfer (max {transferMaxXfer.toLocaleString()} at {tfFrom || '—'})
+              <input
+                value={tfQty}
+                onChange={(e) => setTfQty(e.target.value)}
+                type="number"
+                min="0"
+                max={transferMaxXfer}
+                className="globe-search"
+                style={{ width: '100%', maxWidth: '100%', marginTop: 4 }}
+              />
             </label>
-            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Reason for transfer
+            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+              Reason <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
               <input value={tfReason} onChange={(e) => setTfReason(e.target.value)} className="globe-search" style={{ width: '100%', maxWidth: '100%', marginTop: 4 }} />
             </label>
-            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Requested by
+            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Authorized By
               <input value={tfBy} onChange={(e) => setTfBy(e.target.value)} className="globe-search" style={{ width: '100%', maxWidth: '100%', marginTop: 4 }} />
             </label>
-            <button type="button" className="modal-card__action" onClick={runTransfer} style={{ marginTop: 10 }}>Submit transfer</button>
+            <button type="button" className="modal-card__action" onClick={runTransfer} style={{ marginTop: 10 }}>Submit</button>
             <button type="button" className="modal-card__action" onClick={() => setTransferOpen(false)} style={{ marginTop: 6, borderColor: 'var(--navy-600)' }}>Cancel</button>
           </div>
         </div>
@@ -612,11 +841,14 @@ export function PartsInventoryModule() {
         </div>
       )}
 
-      {writeOffOpen && record && (
+      {writeOffOpen && record && selected && (
         <div className="modal-backdrop" onClick={() => setWriteOffOpen(false)} role="presentation" style={{ zIndex: 1500 }}>
           <div className="modal-card" style={{ maxWidth: 440, width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <h3>Write off</h3>
             <p className="panel__meta"><span className="mono" style={{ fontWeight: 600 }}>{record.sku}</span> — {description} (read only)</p>
+            <p className="panel__meta" style={{ margin: '0.35rem 0', fontWeight: 600, color: '#e2e8f0' }}>
+              Write-off value: {WRITE_OFF_VALUE_DISPLAY.format(woPol.value)}
+            </p>
             <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Quantity
               <input value={fQty} onChange={(e) => setFQty(e.target.value)} type="number" min="0" className="globe-search" style={fieldFull} />
             </label>
@@ -630,16 +862,29 @@ export function PartsInventoryModule() {
             <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>Authorized by
               <input value={fBy} onChange={(e) => setFBy(e.target.value)} className="globe-search" style={fieldFull} />
             </label>
-            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+            {woPol.message && (
+              <div style={{ marginTop: 10, padding: '0.5rem 0.65rem', background: 'rgba(127, 29, 29, 0.28)', border: '1px solid rgba(248, 113, 113, 0.35)', borderRadius: 8, color: '#fecaca', fontSize: 12, fontWeight: 600 }}>
+                {woPol.message}
+              </div>
+            )}
+            <label className="panel__meta" style={{ display: 'block', marginTop: 10 }}>
               <input
                 type="checkbox"
-                checked={fFlag || Number(fQty) > 10}
-                onChange={() => (Number(fQty) <= 10 ? setFFlag((v) => !v) : null)}
-                disabled={Number(fQty) > 10}
+                checked={woCheckedFlag}
+                onChange={() => {
+                  if (!woPolicyFlag) setFWriteOffVoluntary((v) => !v);
+                }}
+                disabled={woPolicyFlag}
               />
-              {Number(fQty) > 10 ? ' Flag for management review (auto — quantity > 10)' : ' Flag for management review'}
+              {' '}
+              Flag for management review
+              {woPolicyFlag && <span className="panel__meta" style={{ marginLeft: 6 }}>(required by policy)</span>}
             </label>
-            {(fFlag || Number(fQty) > 10) && <div style={{ marginTop: 8, color: '#fecaca', fontSize: 12, fontWeight: 600 }}>This adjustment will be flagged for management review</div>}
+            {woCheckedFlag && (
+              <div style={{ marginTop: 8, color: '#fecaca', fontSize: 12, fontWeight: 600 }}>
+                This adjustment will be flagged for management review
+              </div>
+            )}
             <button type="button" className="modal-card__action" onClick={applyWriteOff} style={{ marginTop: 10, borderColor: 'rgba(248, 113, 113, 0.45)' }}>Submit</button>
             <button type="button" className="modal-card__action" onClick={() => setWriteOffOpen(false)} style={{ marginTop: 6 }}>Cancel</button>
           </div>
@@ -647,7 +892,7 @@ export function PartsInventoryModule() {
       )}
 
       <section className="panel panel--span3" style={{ padding: '0.9rem' }}>
-        <h2 style={{ fontSize: 1, margin: 0, marginBottom: 10 }}>Adjustment history — last 30 days</h2>
+        <h2 style={{ fontSize: 1, margin: 0, marginBottom: 10 }}>{movementHistoryTitle}</h2>
           <div className="table-scroll" style={{ maxHeight: 360 }}>
             <table className="data-table" style={{ fontSize: 11.5 }}>
               <thead>
@@ -663,13 +908,13 @@ export function PartsInventoryModule() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((h) => (
+                {displayedMovementHistory.map((h) => (
                   <tr key={h.id} className={h.flagged ? 'data-table__row--flag' : undefined}>
                     <td>{h.timeLabel}</td>
                     <td className="mono">{h.part}</td>
                     <td>{h.description}</td>
                     <td>{h.type}</td>
-                    <td className="num">{h.quantity}</td>
+                    <td className="num">{typeof h.quantity === 'number' ? h.quantity.toLocaleString() : h.quantity}</td>
                     <td>{h.reason}</td>
                     <td>{h.authorizedBy}</td>
                     <td>{h.flagged ? '⚠️ Flagged' : '—'}</td>
