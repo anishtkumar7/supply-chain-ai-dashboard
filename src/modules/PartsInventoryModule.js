@@ -285,7 +285,7 @@ export function PartsInventoryModule() {
       else bc.push(row);
     }
     return { fg, comp, bc };
-  }, [q, skuData, componentData, classBCData]);
+  }, [q, skuData, componentData]);
 
   const allMatches = useMemo(
     () => [
