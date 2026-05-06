@@ -196,11 +196,11 @@ export function CustomerOrdersModule({ onComposeEmail }) {
                   window.dispatchEvent(new CustomEvent('planner-escalations-updated', { detail: next }));
                   return next;
                 });
-                setToast(`Escalated to planner — ${selected.id} added to Supply Planning exceptions`);
+                setToast(`Buyer notified — ${selected.id} added to Supply Planning exceptions for MRP visibility`);
                 setActiveOrder(null);
               }}
             >
-              Escalate to Planner
+              Escalate to Buyer
             </button>
           </div>
         </div>

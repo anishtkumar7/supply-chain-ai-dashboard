@@ -3,6 +3,8 @@ import {
   RIVIT_MC_REPLENISHMENT_QUEUE_KEY,
   RIVIT_MY_WORK_STATION_STATE_KEY,
 } from '../constants/demoStorageKeys';
+import { MY_WORKSTATION_PARTS_CLEAN, MY_WORKSTATION_REQUESTS_CLEAN } from '../data/demoCleanSample';
+import { useDashboardData } from '../context/DashboardDataContext';
 
 const STATION_ID = 'Line 1 — Station 4';
 
@@ -17,13 +19,26 @@ const INITIAL_PARTS = [
   { sku: 'CMP-M8-HXB', description: 'M8 x 25mm Hex Bolt', inventoryClass: 'C', qtyAtStation: 145, minQty: 50, status: 'HEALTHY' },
   { sku: 'CMP-M10-FLN', description: 'M10 Flange Nut', inventoryClass: 'C', qtyAtStation: 38, minQty: 50, status: 'LOW' },
   { sku: 'CMP-RBR-GRM-12', description: 'Rubber Grommet 1/2 inch', inventoryClass: 'C', qtyAtStation: 12, minQty: 30, status: 'CRITICAL' },
-  { sku: 'CMP-WRH-004', description: 'Wiring Harness Complete', inventoryClass: 'A', qtyAtStation: 2, minQty: 3, status: 'LOW' },
+  { sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel and Tire Assembly 11R22.5', inventoryClass: 'A', qtyAtStation: 2, minQty: 4, status: 'CRITICAL' },
+  { sku: 'CMP-WRH-004', description: 'Wiring Harness Complete', inventoryClass: 'A', qtyAtStation: 3, minQty: 3, status: 'WATCH' },
   { sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly', inventoryClass: 'A', qtyAtStation: 1, minQty: 2, status: 'CRITICAL' },
   { sku: 'CMP-SHC-M8', description: 'Socket Head Cap Screw M8', inventoryClass: 'C', qtyAtStation: 89, minQty: 40, status: 'HEALTHY' },
   { sku: 'CMP-THR-LCK-M', description: 'Threadlocker Medium Strength', inventoryClass: 'C', qtyAtStation: 6, minQty: 10, status: 'LOW' },
 ];
 
 const INITIAL_REQUESTS = [
+  {
+    id: 'REQ-WHLDRV-1',
+    sku: 'CMP-WHL-DRV',
+    description: 'Drive Axle Wheel Assembly',
+    requestedQty: 8,
+    status: 'PENDING',
+    createdAt: new Date(Date.now() - 22 * 60 * 1000).toISOString(),
+    stationId: STATION_ID,
+    estDelivery: 'Pending MC acknowledgment',
+    urgency: 'URGENT',
+    notes: 'Only 2 remaining at station, need 4 minimum for next 2 work orders',
+  },
   {
     id: 'REQ-CBL-1',
     sku: 'CMP-CBL-TIE',
@@ -61,7 +76,7 @@ function readState() {
 
 function statusClass(status) {
   if (status === 'HEALTHY') return 'pill pill--healthy';
-  if (status === 'LOW') return 'pill pill--watch';
+  if (status === 'LOW' || status === 'WATCH') return 'pill pill--watch';
   if (status === 'CRITICAL') return 'pill pill--critical';
   if (status === 'REQUESTED') return 'pill pill--requested';
   return 'pill pill--route';
@@ -76,9 +91,10 @@ function ageLabel(iso) {
 }
 
 export function MyWorkStationModule() {
+  const { demoScenario } = useDashboardData();
   const seed = readState();
-  const [parts, setParts] = useState(() => seed?.parts || INITIAL_PARTS);
-  const [requests, setRequests] = useState(() => seed?.requests || INITIAL_REQUESTS);
+  const [parts, setParts] = useState(() => seed?.parts || (demoScenario === 'clean' ? MY_WORKSTATION_PARTS_CLEAN : INITIAL_PARTS));
+  const [requests, setRequests] = useState(() => seed?.requests || (demoScenario === 'clean' ? MY_WORKSTATION_REQUESTS_CLEAN : INITIAL_REQUESTS));
   const [requestModal, setRequestModal] = useState(null);
   const [issueModal, setIssueModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -87,7 +103,9 @@ export function MyWorkStationModule() {
   const [reqUrgency, setReqUrgency] = useState('NORMAL');
   const [reqNotes, setReqNotes] = useState('');
 
-  const [issueSku, setIssueSku] = useState(INITIAL_PARTS[0].sku);
+  const [issueSku, setIssueSku] = useState(
+    () => (demoScenario === 'clean' ? MY_WORKSTATION_PARTS_CLEAN : INITIAL_PARTS)[0].sku
+  );
   const [issueDesc, setIssueDesc] = useState('');
   const [issueQty, setIssueQty] = useState('');
   const [issueLoc, setIssueLoc] = useState(STATION_ID);
@@ -225,7 +243,7 @@ export function MyWorkStationModule() {
                         Request
                       </button>
                     )}
-                    {p.status === 'LOW' && (
+                    {(p.status === 'LOW' || p.status === 'WATCH') && (
                       <button type="button" className="btn my-workstation__btn-low" onClick={() => openRequestModal(p)}>
                         Request Replenishment
                       </button>
@@ -265,7 +283,10 @@ export function MyWorkStationModule() {
             <tbody>
               {activeRequests.map((r) => (
                 <tr key={r.id}>
-                  <td><span className="mono">{r.sku}</span> {r.description}</td>
+                  <td>
+                    <span className="mono">{r.sku}</span> {r.description}
+                    {r.notes ? <div className="panel__meta">{r.notes}</div> : null}
+                  </td>
                   <td>{ageLabel(r.createdAt)}</td>
                   <td><span className={statusClass(r.status === 'DELIVERED' ? 'HEALTHY' : 'REQUESTED')}>{r.status}</span></td>
                   <td>{r.estDelivery}</td>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { RECEIVING_HISTORY_CLEAN } from '../data/demoCleanSample';
 
 const INBOUND_QUEUE = [
   { shipmentId: 'SHP-30481', poNumber: 'PO-2026-0040', sku: 'CMP-ENG-001', supplier: 'Detroit Power Systems', origin: 'Port of Shanghai', carrier: 'Maersk', etaDays: 9, status: 'AT SEA', expectedQty: 200 },
@@ -8,13 +9,16 @@ const INBOUND_QUEUE = [
   { shipmentId: 'SHP-30531', poNumber: 'PO-2026-0036', sku: 'CMP-WRH-004', supplier: 'Chennai Cable & Harness', origin: 'Toronto', carrier: 'CN Rail', etaDays: 1, status: 'IN YARD — STUCK', expectedQty: 8000, stuck: true },
 ];
 
-const INITIAL_HISTORY = [
+const RECEIVING_HISTORY_CRISIS = [
+  { date: 'May 02', shipmentId: 'SHP-30522', poNumber: 'PO-2026-0037', sku: 'CMP-WHL-DRV', supplier: 'Detroit Wheel Systems', expectedQty: 24, receivedQty: 12, variance: -12, condition: 'Short Ship — supplier confirmed', receivedBy: 'S. Patel', status: 'DISCREPANCY' },
   { date: 'Apr 25', shipmentId: 'SHP-30470', poNumber: 'PO-2026-0033', sku: 'CMP-HYD-008', supplier: 'Rotterdam Industrial', expectedQty: 4000, receivedQty: 4000, variance: 0, condition: 'Good', receivedBy: 'J. Martinez', status: 'COMPLETE' },
   { date: 'Apr 22', shipmentId: 'SHP-30465', poNumber: 'PO-2026-0031', sku: 'CMP-ECU-007', supplier: 'Penang PCB', expectedQty: 16000, receivedQty: 15840, variance: -160, condition: 'Good — short ship', receivedBy: 'J. Martinez', status: 'DISCREPANCY' },
   { date: 'Apr 18', shipmentId: 'SHP-30458', poNumber: 'PO-2026-0029', sku: 'CMP-STL-005', supplier: 'Monterrey Metal', expectedQty: 45000, receivedQty: 45000, variance: 0, condition: 'Good', receivedBy: 'P. Patel', status: 'COMPLETE' },
   { date: 'Apr 15', shipmentId: 'SHP-30451', poNumber: 'PO-2026-0027', sku: 'CMP-CAB-010', supplier: 'Ho Chi Minh Plastics', expectedQty: 8000, receivedQty: 7200, variance: -800, condition: 'Damaged partial accept', receivedBy: 'J. Martinez', status: 'DISCREPANCY' },
   { date: 'Apr 10', shipmentId: 'SHP-30444', poNumber: 'PO-2026-0025', sku: 'CMP-TCM-003', supplier: 'Penang PCB', expectedQty: 12000, receivedQty: 12000, variance: 0, condition: 'Good', receivedBy: 'S. Patel', status: 'COMPLETE' },
 ];
+
+const INITIAL_HISTORY = RECEIVING_HISTORY_CRISIS;
 
 const CONDITIONS = ['Good', 'Damaged', 'Short Ship'];
 const RESOLUTIONS = ['Supplier Credit Requested', 'Return to Supplier', 'Write Off', 'Under Investigation'];
@@ -24,9 +28,11 @@ function fmtDate(date) {
 }
 
 export function ReceivingModule({ loggedInName, onComposeEmail }) {
-  const { shipmentData, setShipmentData, setComponentData, supplierData } = useDashboardData();
+  const { shipmentData, setShipmentData, setComponentData, supplierData, demoScenario } = useDashboardData();
   const [queue, setQueue] = useState(INBOUND_QUEUE);
-  const [history, setHistory] = useState(INITIAL_HISTORY);
+  const [history, setHistory] = useState(() =>
+    demoScenario === 'clean' ? [...RECEIVING_HISTORY_CLEAN] : [...INITIAL_HISTORY]
+  );
   const [receiptModal, setReceiptModal] = useState(null);
   const [resolveModal, setResolveModal] = useState(null);
   const [toast, setToast] = useState('');

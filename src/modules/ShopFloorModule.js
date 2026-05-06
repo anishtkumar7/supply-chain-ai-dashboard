@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { SHOP_FLOAT_STATUS_CLEAN, SHOP_SHORTAGES_CLEAN, SHOP_WO_4424_CLEAN } from '../data/demoCleanSample';
 
 const LINES = [
   { id: 'line1', title: 'Line 1 — Assembly', status: 'RUNNING', build: 'FG-T800-CL Class 8 Highway Tractor', planned: 12, complete: 7, shift: 'Day Shift ends 3:00 PM' },
@@ -22,8 +23,8 @@ const WORK_ORDERS = [
     bom: [{ sku: 'CMP-BAT-009', required: 400, available: 280, status: 'CRITICAL' }, { sku: 'CMP-INV-006', required: 400, available: 620, status: 'AVAILABLE' }],
   },
   {
-    id: 'WO-4424', line: 'Line 1', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', planned: 6, complete: 0, progress: 0, parts: 'Parts Shortage — CMP-WRH-004', partsState: 'critical', start: '2:00 PM', status: 'PENDING — SHORTAGE',
-    bom: [{ sku: 'CMP-WRH-004', required: 6200, available: 900, status: 'CRITICAL' }, { sku: 'CMP-AXL-002', required: 6, available: 1100, status: 'AVAILABLE' }],
+    id: 'WO-4424', line: 'Line 1', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', planned: 6, complete: 0, progress: 0, parts: 'Parts Shortage — CMP-WHL-DRV', partsState: 'critical', start: '2:00 PM', status: 'PENDING — SHORTAGE',
+    bom: [{ sku: 'CMP-WHL-DRV', required: 8, available: 14, status: 'CRITICAL' }, { sku: 'CMP-AXL-002', required: 6, available: 1100, status: 'AVAILABLE' }],
   },
   {
     id: 'WO-4425', line: 'Line 3', product: 'Medium Duty Platform', sku: 'FG-M550-MD', planned: 5, complete: 0, progress: 0, parts: 'Checking inventory', partsState: 'warn', start: '2:00 PM', status: 'SCHEDULED',
@@ -32,8 +33,8 @@ const WORK_ORDERS = [
 ];
 
 const SHORTAGES = [
+  { sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel Assembly', workOrder: 'WO-4424', shortQty: 8, daysToStop: 0 },
   { sku: 'CMP-BAT-009', description: 'EV Battery Pack', workOrder: 'WO-4423', shortQty: 120, daysToStop: 0 },
-  { sku: 'CMP-WRH-004', description: 'Wiring Harness', workOrder: 'WO-4424', shortQty: 6200, daysToStop: 0 },
 ];
 
 const FLOAT_STATUS_SEED = [
@@ -48,11 +49,11 @@ const FLOAT_STATUS_SEED = [
     },
   },
   {
-    component: 'Drive Axle Assembly HD',
-    sku: 'CMP-AXL-002',
+    component: 'Drive Axle Wheel Assembly 11R22.5',
+    sku: 'CMP-WHL-DRV',
     lines: {
-      'Line 1': { count: 3, target: 4, status: 'HEALTHY' },
-      'Line 2': { count: 1, target: 4, status: 'CRITICAL' },
+      'Line 1': { count: 2, target: 4, status: 'CRITICAL' },
+      'Line 2': null,
       'Line 3': null,
       'Line 4': null,
     },
@@ -117,13 +118,30 @@ function deriveFloatStatus(count, target) {
   return 'CRITICAL';
 }
 
+function cloneDeep(v) {
+  return JSON.parse(JSON.stringify(v));
+}
+
 export function ShopFloorModule({ onComposeEmail }) {
-  const { contactDirectory, addAdjustmentHistory } = useDashboardData();
+  const { contactDirectory, addAdjustmentHistory, demoScenario } = useDashboardData();
+
+  const workOrders = useMemo(() => {
+    if (demoScenario !== 'clean') return WORK_ORDERS;
+    return WORK_ORDERS.map((w) => (w.id === 'WO-4424' ? { ...SHOP_WO_4424_CLEAN } : w));
+  }, [demoScenario]);
+
+  const shortagesForScenario = useMemo(
+    () => (demoScenario === 'clean' ? SHOP_SHORTAGES_CLEAN : SHORTAGES),
+    [demoScenario]
+  );
+
   const [expandedWo, setExpandedWo] = useState(null);
   const [stoppageModal, setStoppageModal] = useState(null);
   const [transferModal, setTransferModal] = useState(null);
-  const [plannerModal, setPlannerModal] = useState(false);
-  const [floatRows, setFloatRows] = useState(FLOAT_STATUS_SEED);
+  const [escalationContactModal, setEscalationContactModal] = useState(null);
+  const [floatRows, setFloatRows] = useState(() =>
+    demoScenario === 'clean' ? cloneDeep(SHOP_FLOAT_STATUS_CLEAN) : cloneDeep(FLOAT_STATUS_SEED)
+  );
   const [floatModal, setFloatModal] = useState(null);
   const [floatNewCount, setFloatNewCount] = useState('');
   const [floatUpdatedBy, setFloatUpdatedBy] = useState('');
@@ -131,6 +149,10 @@ export function ShopFloorModule({ onComposeEmail }) {
 
   const planner = useMemo(
     () => contactDirectory.find((c) => c.name === 'Marcus Williams') || contactDirectory.find((c) => /Supply Planner/i.test(c.role)),
+    [contactDirectory]
+  );
+  const buyer = useMemo(
+    () => contactDirectory.find((c) => /buyer/i.test(c.role)) || contactDirectory[0],
     [contactDirectory]
   );
 
@@ -148,9 +170,12 @@ export function ShopFloorModule({ onComposeEmail }) {
       ['Line 1', 'Line 2', 'Line 3', 'Line 4'].forEach((line) => {
         const cell = row.lines[line];
         if (cell?.status === 'CRITICAL') {
+          const isDrvWheel = row.sku === 'CMP-WHL-DRV' && line === 'Line 1';
           alerts.push({
             id: `${row.sku}-${line}`,
-            text: `${row.component} float CRITICAL at ${line} — trucker replenishment required immediately`,
+            text: isDrvWheel
+              ? 'CMP-WHL-DRV Drive Axle Wheel Assembly — 2 units remaining at Line 1. Sequenced component — no float buffer. At current build rate line stoppage in approximately 8-10 hours. Immediate escalation required.'
+              : `${row.component} float CRITICAL at ${line} — trucker replenishment required immediately`,
           });
         }
       });
@@ -160,12 +185,15 @@ export function ShopFloorModule({ onComposeEmail }) {
 
   const shortageCards = useMemo(
     () => [
-      ...SHORTAGES.map((s) => ({
+      ...shortagesForScenario.map((s) => ({
         id: s.sku,
         title: `${s.sku} ${s.description}`,
         detail1: `Work Order: ${s.workOrder}`,
         detail2: `Quantity short: ${s.shortQty}`,
-        detail3: `Days until line stoppage: ${s.daysToStop === 0 ? 'line already stopped' : s.daysToStop}`,
+        detail3:
+          s.sku === 'CMP-WHL-DRV'
+            ? 'Sequenced component — no float buffer. At current build rate line stoppage in approximately 8-10 hours.'
+            : `Days until line stoppage: ${s.daysToStop === 0 ? 'line already stopped' : s.daysToStop}`,
         sku: s.sku,
         canActions: true,
       })),
@@ -179,7 +207,7 @@ export function ShopFloorModule({ onComposeEmail }) {
         canActions: false,
       })),
     ],
-    [floatCriticalAlerts]
+    [floatCriticalAlerts, shortagesForScenario]
   );
 
   const openFloatUpdate = (component, line, cell) => {
@@ -242,7 +270,7 @@ export function ShopFloorModule({ onComposeEmail }) {
                   className="btn btn--ghost"
                   onClick={() => {
                     setStoppageModal(l);
-                    setStoppageForm((f) => ({ ...f, notifyEmail: planner?.email || contactDirectory[0]?.email || '' }));
+                    setStoppageForm((f) => ({ ...f, notifyEmail: buyer?.email || contactDirectory[0]?.email || '' }));
                   }}
                 >
                   Flag Stoppage
@@ -313,7 +341,7 @@ export function ShopFloorModule({ onComposeEmail }) {
               <tr><th>Work Order</th><th>Line</th><th>Product</th><th>SKU</th><th>Planned Qty</th><th>Completed Qty</th><th>Progress</th><th>Parts Status</th><th>Start Time</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {WORK_ORDERS.map((w) => (
+              {workOrders.map((w) => (
                 <Fragment key={w.id}>
                   <tr key={w.id} onClick={() => setExpandedWo((id) => (id === w.id ? null : w.id))} className={w.partsState === 'critical' ? 'data-table__row--shortage' : undefined} style={{ cursor: 'pointer' }}>
                     <td>{w.id}</td><td>{w.line}</td><td>{w.product}</td><td>{w.sku}</td><td>{w.planned}</td><td>{w.complete}</td>
@@ -358,10 +386,14 @@ export function ShopFloorModule({ onComposeEmail }) {
                 {s.canActions ? (
                   <>
                     <button type="button" className="btn btn--ghost" onClick={() => setTransferModal({ sku: s.sku, workOrder: s.detail1.replace('Work Order: ', ''), shortQty: s.detail2.replace('Quantity short: ', '') })}>Request Emergency Transfer</button>
-                    <button type="button" className="btn btn--green" onClick={() => setPlannerModal(true)}>Contact Planner</button>
+                    <button type="button" className="btn btn--green" onClick={() => setEscalationContactModal(buyer || planner)}>
+                      Contact Buyer
+                    </button>
                   </>
                 ) : (
-                  <button type="button" className="btn btn--ghost" onClick={() => setPlannerModal(true)}>Contact Planner</button>
+                  <button type="button" className="btn btn--ghost" onClick={() => setEscalationContactModal(buyer || planner)}>
+                    Contact Buyer
+                  </button>
                 )}
               </div>
             </article>
@@ -418,29 +450,32 @@ export function ShopFloorModule({ onComposeEmail }) {
         </div>
       )}
 
-      {plannerModal && planner && (
+      {escalationContactModal && (
         <div className="po-modal-backdrop">
           <div className="po-modal">
-            <h3>{planner.name}</h3>
-            <p className="panel__lede">{planner.role} · {planner.email}</p>
+            <h3>{escalationContactModal.name}</h3>
+            <p className="panel__lede">{escalationContactModal.role} · {escalationContactModal.email}</p>
             <div className="po-inline-actions">
               <button
                 type="button"
                 className="btn btn--green"
                 onClick={() =>
                   onComposeEmail({
-                    recipientName: planner.name,
-                    recipientEmail: planner.email,
+                    recipientName: escalationContactModal.name,
+                    recipientEmail: escalationContactModal.email,
                     subject: 'Shop floor shortage escalation',
-                    body: 'Hi Marcus,\n\nShop floor has active shortages requiring immediate planning support:\n- CMP-BAT-009 (WO-4423)\n- CMP-WRH-004 (WO-4424)\n\nPlease advise.\n\nThanks,\nShop Floor',
+                    body:
+                      demoScenario === 'clean'
+                        ? 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WRH-004 (WO-4424)\n- CMP-BAT-009 (WO-4423)\n\nPlease advise.\n\nThanks,\nShop Floor'
+                        : 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WHL-DRV (WO-4424)\n- CMP-BAT-009 (WO-4423)\n\nPlease advise.\n\nThanks,\nShop Floor',
                   })
                 }
               >
                 Email
               </button>
-              <button type="button" className="btn btn--ghost" onClick={() => window.open(`msteams://l/chat/0/0?users=${planner.teamsHandle}`, '_blank')}>Teams</button>
-              <button type="button" className="btn btn--ghost" onClick={() => window.open(`slack://user?team=vectrum&id=${planner.slackHandle}`, '_blank')}>Slack</button>
-              <button type="button" className="btn btn--ghost" onClick={() => setPlannerModal(false)}>Close</button>
+              <button type="button" className="btn btn--ghost" onClick={() => window.open(`msteams://l/chat/0/0?users=${escalationContactModal.teamsHandle}`, '_blank')}>Teams</button>
+              <button type="button" className="btn btn--ghost" onClick={() => window.open(`slack://user?team=vectrum&id=${escalationContactModal.slackHandle}`, '_blank')}>Slack</button>
+              <button type="button" className="btn btn--ghost" onClick={() => setEscalationContactModal(null)}>Close</button>
             </div>
           </div>
         </div>

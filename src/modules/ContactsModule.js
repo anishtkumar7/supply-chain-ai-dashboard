@@ -9,9 +9,16 @@ function openSlack(handle) {
   window.open(`slack://user?team=vectrum&id=${encodeURIComponent(handle)}`, '_blank');
 }
 
+const PRIMARY_BUYER_NOTE = 'Primary contact for all supplier escalations and PO issues';
+
 export function ContactsModule({ onComposeEmail }) {
   const { contactDirectory, supplierData } = useDashboardData();
   const [phoneModal, setPhoneModal] = useState(null);
+
+  const primaryBuyerCard = contactDirectory.find((c) => /senior buyer/i.test(c.role));
+  const otherInternalContacts = primaryBuyerCard
+    ? contactDirectory.filter((c) => c.email !== primaryBuyerCard.email)
+    : contactDirectory;
 
   return (
     <div className="module-grid">
@@ -21,7 +28,34 @@ export function ContactsModule({ onComposeEmail }) {
           <span className="panel__meta">Procurement, planning, operations, management</span>
         </div>
         <div className="contacts-grid">
-          {contactDirectory.map((c) => (
+          {primaryBuyerCard && (
+            <article key={primaryBuyerCard.email} className="contacts-card contacts-card--primary-contact">
+              <strong>{primaryBuyerCard.name}</strong>
+              <div className="comms-meta">{primaryBuyerCard.role} · {primaryBuyerCard.department}</div>
+              <div className="comms-meta">{primaryBuyerCard.email}</div>
+              <p className="contacts-card__highlight-note">{PRIMARY_BUYER_NOTE}</p>
+              <div className="po-inline-actions">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="Email"
+                  onClick={() =>
+                    onComposeEmail({
+                      recipientName: primaryBuyerCard.name,
+                      recipientEmail: primaryBuyerCard.email,
+                      subject: `Internal sync — ${primaryBuyerCard.department}`,
+                      body: `Hi ${primaryBuyerCard.name},\n\nCan we sync on current supplier and PO escalations?\n\nThanks.`,
+                    })
+                  }
+                >
+                  ✉️
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={() => openTeams(primaryBuyerCard.teamsHandle)}>Teams</button>
+                <button type="button" className="btn btn--ghost" onClick={() => openSlack(primaryBuyerCard.slackHandle)}>Slack</button>
+              </div>
+            </article>
+          )}
+          {otherInternalContacts.map((c) => (
             <article key={c.email} className="contacts-card">
               <strong>{c.name}</strong>
               <div className="comms-meta">{c.role} · {c.department}</div>

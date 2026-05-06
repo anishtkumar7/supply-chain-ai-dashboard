@@ -34,7 +34,8 @@ function severityPillClass(severity) {
 }
 
 export function AIAgentsModule({ onComposeEmail }) {
-  const { skuData, shipmentData, supplierData, componentData, customerOrderData, contactDirectory } = useDashboardData();
+  const { skuData, shipmentData, supplierData, componentData, customerOrderData, contactDirectory, demoScenario } =
+    useDashboardData();
   const [nowMs, setNowMs] = useState(Date.now());
   const [dismissed, setDismissed] = useState(loadDismissedAlertIds);
   const [actions, setActions] = useState({});
@@ -89,11 +90,11 @@ export function AIAgentsModule({ onComposeEmail }) {
 
   function actionOptionsForAgent(agent) {
     const map = {
-      'inventory-agent': ['Create Reorder Request', 'Notify Planner', 'View SKU Detail'],
+      'inventory-agent': ['Create Reorder Request', 'Notify Buyer', 'View SKU Detail'],
       'supply-planning-agent': ['Draft PO for Approval', 'Expedite Existing PO', 'Notify Buyer'],
       'fulfillment-agent': ['Escalate to Carrier', 'Request Air Freight Quote', 'Notify Customer Service'],
       'supplier-risk-agent': ['Find Alternate Supplier', 'Expedite Current Order', 'Escalate to Procurement Manager'],
-      'order-bank-agent': ['Notify Customer of Delay', 'Pull Forward Inventory', 'Escalate to Planner'],
+      'order-bank-agent': ['Notify Customer of Delay', 'Pull Forward Inventory', 'Escalate to Buyer'],
       'forecast-agent': ['Adjust Forecast', 'Flag for Planner Review', 'Update Demand Plan'],
     };
     const base = map[agent.id] || ['Review Alert', 'Notify Owner', 'Open Module Detail'];
@@ -128,12 +129,31 @@ export function AIAgentsModule({ onComposeEmail }) {
     const highBias = skuData.filter((s) => Math.abs(s.forecastBias) > 5);
     const overdueComponents = componentData.filter((c) => c.reorderDate < '2026-04-28' && c.netNeed > 0);
 
-    const byLowCover = lowCover[0];
     const byRiskyShipment = riskyShipments[0];
     const byStuckSupplier = stuckSuppliers[0];
-    const byOverdueComp = overdueComponents[0];
-    const byRiskyOrder = riskyOrders[0];
     const byBias = highBias[0];
+    const byLowCover = lowCover[0];
+    const byRiskyOrder = riskyOrders[0];
+    const byOverdueComp = overdueComponents[0];
+
+    const crisisOrderBankAlert =
+      'FG-T800-CL Class 8 Highway Tractor — 3 work orders at risk of missing promise date due to CMP-WHL-DRV shortage. WO-4421, WO-4424, WO-4428 all require drive axle wheel assemblies within next 4 days.';
+    const crisisInventoryAlert =
+      'CMP-WHL-DRV Drive Axle Wheel Assembly at 4 days supply. 14 units on hand. Current build rate requires 3-4 units per day sequenced to Line 1. No inbound shipment confirmed. Reorder overdue 8 days.';
+    const crisisSupplyPlanningAlert =
+      'CMP-WHL-DRV Drive Axle Wheel and Tire Assembly 11R22.5 at 4 days supply. Reorder date was 2026-04-28 — 8 days overdue. No PO acknowledged from Detroit Wheel Systems. These are sequenced to work orders — no float buffer exists. Line 1 complete stoppage risk within 4 days. Recommend immediate supplier escalation and air freight evaluation.';
+
+    const cleanOrderBankAlert = riskyOrders.length
+      ? `${byRiskyOrder.sku}: ${riskyOrders.length} orders at risk of missing promise date. Expedite recommended.`
+      : null;
+    const cleanInventoryAlert = lowCover.length
+      ? `${byLowCover.sku} at ${daysCoverFromWks(byLowCover.wksCover)} days cover. No inbound shipment detected. Reorder triggered.`
+      : null;
+    const cleanSupplyPlanningAlert = overdueComponents.length
+      ? `${byOverdueComp.sku} reorder date ${byOverdueComp.reorderDate}. No PO created. Line stoppage risk rising.`
+      : null;
+
+    const useClean = demoScenario === 'clean';
 
     return [
       {
@@ -144,9 +164,7 @@ export function AIAgentsModule({ onComposeEmail }) {
         severity: riskyOrders.length ? 'HIGH' : null,
         runAtMs: nowMs - 7 * 60000,
         lastAction: riskyOrders.length ? 'Identified promise-date risk orders' : 'No order exceptions detected',
-        alert: riskyOrders.length
-          ? `${byRiskyOrder.sku}: ${riskyOrders.length} orders at risk of missing promise date. Expedite recommended.`
-          : null,
+        alert: riskyOrders.length ? (useClean ? cleanOrderBankAlert : crisisOrderBankAlert) : null,
       },
       {
         id: 'inventory-agent',
@@ -156,9 +174,7 @@ export function AIAgentsModule({ onComposeEmail }) {
         severity: lowCover.length ? 'CRITICAL' : null,
         runAtMs: nowMs - 4 * 60000,
         lastAction: lowCover.length ? 'Flagged low-cover SKU and checked inbound' : 'Inventory policy thresholds healthy',
-        alert: lowCover.length
-          ? `${byLowCover.sku} at ${daysCoverFromWks(byLowCover.wksCover)} days cover. No inbound shipment detected. Reorder triggered.`
-          : null,
+        alert: lowCover.length ? (useClean ? cleanInventoryAlert : crisisInventoryAlert) : null,
       },
       {
         id: 'supplier-risk-agent',
@@ -208,16 +224,30 @@ export function AIAgentsModule({ onComposeEmail }) {
             ? 'Updated planning exceptions and PO risk queue'
             : 'No overdue reorder exceptions',
         alert: overdueComponents.length
-          ? `${byOverdueComp.sku} reorder date ${byOverdueComp.reorderDate}. No PO created. Line stoppage risk rising.`
+          ? useClean
+            ? cleanSupplyPlanningAlert
+            : crisisSupplyPlanningAlert
           : plannerEscalations.length
             ? `Escalated customer orders in planning queue: ${plannerEscalations.join(', ')}.`
             : null,
       },
     ];
-  }, [nowMs, plannerEscalations, skuData, shipmentData, supplierData, componentData, customerOrderData]);
+  }, [nowMs, plannerEscalations, skuData, shipmentData, supplierData, componentData, customerOrderData, demoScenario]);
 
   const plannerContact = contactDirectory.find((c) => /supply planner/i.test(c.role));
   const buyerContact = contactDirectory.find((c) => /buyer/i.test(c.role));
+
+  function prefersPlannerPrimaryContact(agent) {
+    if (agent.id === 'forecast-agent') return true;
+    if (
+      agent.id === 'supply-planning-agent' &&
+      agent.alert &&
+      /escalated customer orders in planning queue/i.test(agent.alert)
+    ) {
+      return true;
+    }
+    return false;
+  }
 
   function isSupplierAlert(agentId) {
     return agentId === 'supplier-risk-agent' || agentId === 'fulfillment-agent';
@@ -291,15 +321,15 @@ export function AIAgentsModule({ onComposeEmail }) {
                   Contact Supplier
                 </button>
               )}
-              {agent.alert && !isSupplierAlert(agent.id) && (
-                <>
-                  <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: plannerContact, agent })}>
-                    Contact Planner
-                  </button>
-                  <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: buyerContact, agent })}>
-                    Contact Buyer
-                  </button>
-                </>
+              {agent.alert && !isSupplierAlert(agent.id) && prefersPlannerPrimaryContact(agent) && (
+                <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: plannerContact, agent })}>
+                  Contact Planner
+                </button>
+              )}
+              {agent.alert && !isSupplierAlert(agent.id) && !prefersPlannerPrimaryContact(agent) && (
+                <button type="button" className="nav-btn" onClick={() => setInternalContactModal({ contact: buyerContact, agent })}>
+                  Contact Buyer
+                </button>
               )}
               <button
                 type="button"

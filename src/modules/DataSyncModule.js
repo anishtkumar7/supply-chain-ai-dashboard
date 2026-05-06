@@ -22,7 +22,7 @@ import {
   forecastRows,
   exportSheet,
 } from '../utils/exportUtils';
-import { clearDemoLocalStorage } from '../constants/demoStorageKeys';
+import { reloadWithCleanSample, reloadWithCrisisDemoSeed } from '../utils/demoScenarioBoot';
 
 const SERVICE_ACCOUNT = 'vectrum-sync@rivit.iam.gserviceaccount.com';
 
@@ -619,16 +619,26 @@ export function DataSyncModule() {
     }, 2000);
   };
 
-  const onResetDemoData = () => {
+  const onResetToDemoState = () => {
     if (
       !window.confirm(
-        'Reset all saved demo data for this browser? This clears local inventory/PO/playbook/saved settings and reloads the page.'
+        'This will reset all local changes and restore the Vectrum Manufacturing crisis scenario. Continue?'
       )
     ) {
       return;
     }
-    clearDemoLocalStorage();
-    window.location.reload();
+    reloadWithCrisisDemoSeed();
+  };
+
+  const onClearAllLocalData = () => {
+    if (
+      !window.confirm(
+        'This clears all locally stored dashboard data for this browser and reloads using the neutral demo sample (no pre-loaded CMP-WHL-DRV crisis storyline). Continue?'
+      )
+    ) {
+      return;
+    }
+    reloadWithCleanSample();
   };
 
   const onGsSync = () => {
@@ -660,20 +670,37 @@ export function DataSyncModule() {
         connect your ERP to see your real operations in RIVIT.
       </div>
 
-      <section className="panel" style={{ marginBottom: 20 }}>
-        <div className="panel__head">
-          <div>
-            <div className="panel__title">Demo session</div>
-            <p className="panel__meta" style={{ margin: 0 }}>
-              Parts adjustments, purchase orders, playbook actions, agent dismissals, and display density are saved in this
-              browser (localStorage). Use reset between demos to return to sample data.
-            </p>
+      {process.env.NODE_ENV !== 'production' && (
+        <section
+          className="panel data-sync-demo-controls"
+          style={{
+            marginBottom: 20,
+            border: '1px solid rgba(148, 163, 184, 0.28)',
+            borderRadius: 10,
+            background: 'rgba(15, 31, 54, 0.45)',
+          }}
+        >
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Demo Controls</div>
+              <p className="panel__meta" style={{ margin: 0 }}>
+                Reset the browser-backed demo sandbox. Does not affect a real ERP connection.
+              </p>
+            </div>
           </div>
-        </div>
-        <button type="button" className="btn btn--danger" onClick={onResetDemoData}>
-          Reset demo data
-        </button>
-      </section>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <button type="button" className="btn data-sync-demo-controls__reset" onClick={onResetToDemoState}>
+              Reset to Demo State
+            </button>
+            <button type="button" className="btn data-sync-demo-controls__clear" onClick={onClearAllLocalData}>
+              Clear All Local Data
+            </button>
+          </div>
+          <p className="data-sync-demo-controls__note panel__meta" style={{ margin: '12px 0 0', color: '#94a3b8' }}>
+            Demo controls only — not visible in production
+          </p>
+        </section>
+      )}
 
       <section className="panel" style={{ marginBottom: 20 }}>
         <div className="panel__head">

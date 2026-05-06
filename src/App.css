@@ -2001,6 +2001,21 @@ a.link-blueprint:hover,
   padding: 0.7rem;
 }
 
+.contacts-card--primary-contact {
+  grid-column: 1 / -1;
+  border-color: rgba(34, 197, 94, 0.42);
+  background: rgba(13, 40, 24, 0.38);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.1), 0 8px 28px rgba(0, 0, 0, 0.25);
+  padding: 0.85rem 0.95rem;
+}
+
+.contacts-card__highlight-note {
+  margin: 0.45rem 0 0.15rem;
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.88);
+  line-height: 1.4;
+}
+
 .contact-pop {
   margin-top: 0.35rem;
   border: 1px solid var(--navy-600);
@@ -3185,4 +3200,26 @@ a.link-blueprint,
   height: 150px;
   min-height: 130px;
   max-height: 150px;
+}
+
+/* Data Sync — dev-only demo sandbox */
+.data-sync-demo-controls__reset {
+  background: linear-gradient(180deg, rgba(251, 146, 60, 0.95), rgba(234, 88, 12, 0.92)) !important;
+  color: #0f172a !important;
+  border-color: rgba(251, 146, 60, 0.55) !important;
+  font-weight: 650;
+}
+
+.data-sync-demo-controls__reset:hover {
+  filter: brightness(1.06);
+}
+
+.data-sync-demo-controls__clear {
+  background: rgba(51, 65, 85, 0.75) !important;
+  color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.45) !important;
+}
+
+.data-sync-demo-controls__clear:hover {
+  background: rgba(71, 85, 105, 0.85) !important;
 }

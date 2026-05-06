@@ -21,7 +21,7 @@ function allocateInt(n, ratios) {
   return parts;
 }
 
-function hashSku(sku) {
+export function hashSku(sku) {
   let h = 0;
   for (let i = 0; i < sku.length; i += 1) h = (Math.imul(31, h) + sku.charCodeAt(i)) | 0;
   return Math.abs(h);
@@ -280,6 +280,68 @@ function buildSequencedClassAStory(row, h) {
 
   events.sort((a, b) => new Date(a.at) - new Date(b.at));
   return events;
+}
+
+/** Stable export rows for a sequenced Class A row (clean demo / helpers). */
+export function exportedEntriesForSequencedRow(row, h = 0) {
+  const raw = buildSequencedClassAStory(row, h);
+  return toExportEntries(raw, row.sku, row.description, h);
+}
+
+function buildCmpWhlDrvCrisisStory(description) {
+  const rows = [];
+  let id = 0;
+  const push = (timestamp, type, qty, reason, authorizedBy, flagged = false) => {
+    rows.push({
+      id: `CMP-WHL-DRV-CRISIS-${++id}`,
+      timestamp,
+      sku: 'CMP-WHL-DRV',
+      description,
+      type,
+      qty,
+      reason,
+      authorizedBy,
+      flagged,
+    });
+  };
+
+  push(
+    '2026-04-22T10:30:00.000Z',
+    'Received from Supplier',
+    24,
+    'Received from Supplier — Detroit Wheel Systems — PO-2026-0031 — 24 units to Receiving Dock',
+    'S. Patel'
+  );
+  push('2026-04-25T14:00:00.000Z', 'Sequenced Delivery', -8, 'Sequenced delivery WO-4418 complete — 8 units', 'J. Martinez');
+  push(
+    '2026-04-28T09:00:00.000Z',
+    'Planning Alert',
+    0,
+    'Reorder date passed — no PO created — flagged by Supply Planning Agent',
+    'R. Chen',
+    true
+  );
+  push('2026-04-30T11:00:00.000Z', 'Sequenced Delivery', -6, 'Sequenced delivery WO-4419 complete — 6 units', 'J. Martinez');
+  push(
+    '2026-05-02T15:30:00.000Z',
+    'Received from Supplier',
+    12,
+    'Received from Supplier — Detroit Wheel Systems — PO-2026-0037 — 12 units to Receiving Dock — short shipment vs 24 ordered',
+    'S. Patel',
+    true
+  );
+  push('2026-05-03T06:45:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery WO-4421 — Unit 1 — 2 units', 'J. Martinez');
+  push('2026-05-03T14:15:00.000Z', 'Sequenced Delivery', -4, 'Sequenced delivery WO-4421 — Units 2 and 3 — 4 units', 'J. Martinez');
+  push('2026-05-04T08:30:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery WO-4421 — Unit 4 of 6 axles — 2 units', 'J. Martinez');
+  push(
+    '2026-05-04T10:14:00.000Z',
+    'Operator Request',
+    8,
+    'Operator Request — URGENT — Op. Rodriguez Line 1 Station 4 — 8 units requested — PENDING — J. Martinez investigating',
+    'J. Martinez',
+    true
+  );
+  return rows;
 }
 
 /** Finished goods: 4–6 rows — production, internal transfers, order commitment (ATP) */
@@ -543,6 +605,10 @@ export function buildPartMovementHistory(skuRows, componentRows, classBCRows) {
 
   for (const row of componentRows) {
     const h = hashSku(row.sku);
+    if (row.sku === 'CMP-WHL-DRV') {
+      out[row.sku] = buildCmpWhlDrvCrisisStory(row.description);
+      continue;
+    }
     const raw = row.sequenced ? buildSequencedClassAStory(row, h) : buildCmpDockStoryCompact(row, 'class-a', h);
     out[row.sku] = toExportEntries(raw, row.sku, row.description, h);
   }

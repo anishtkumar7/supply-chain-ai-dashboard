@@ -53,6 +53,7 @@ import { ExecutivePdfPrintView } from './components/ExecutivePdfPrintView';
 import { GenericPdfPrintView } from './components/GenericPdfPrintView';
 import { SyncHealthStrip } from './components/SyncHealthStrip';
 import { useExportRegistrationContext } from './context/ExportRegistrationContext';
+import { appendEscalationHint, primaryEscalationHintFromAgentAlert } from './utils/escalationContactHint';
 
 const RIVIT_AI_OPENING =
   'Hello! I am your RIVIT Intelligence Assistant. I have full visibility into your Vectrum Manufacturing operations data. You can ask me things like:\n• Which SKUs are at risk of stockout this week?\n• What is my total tariff exposure?\n• Which supplier is causing the most delays?\n• What should I reorder today?\n• Summarize my critical alerts';
@@ -131,6 +132,7 @@ function moduleLabelToMeta(label) {
     'Trade Risk': { moduleId: 'trade-risk', category: 'trade' },
     'Supply Planning': { moduleId: 'planning', category: 'planning' },
     'Order Bank': { moduleId: 'orderbank', category: 'customer' },
+    Receiving: { moduleId: RECEIVING_ID, category: 'inventory' },
   };
   return m[label] || { moduleId: 'executive', category: 'info' };
 }
@@ -177,7 +179,7 @@ function defaultNotificationsFromAgents(agentAlerts) {
         id: `agent-${idx}-${a.agent}`,
         severity: a.severity || 'INFO',
         title: a.agent,
-        body: a.alert,
+        body: `${a.alert}\n\n${primaryEscalationHintFromAgentAlert(a)}`,
         moduleLabel: a.module,
         moduleId: meta.moduleId,
         category: meta.category,
@@ -185,6 +187,207 @@ function defaultNotificationsFromAgents(agentAlerts) {
         read: false,
       };
     });
+}
+
+function cannedDemoNotifications(demoScenario) {
+  if (demoScenario === 'clean') {
+    return [
+      {
+        id: 'n1',
+        severity: 'CRITICAL',
+        title: 'FG-R450-CO Stock Critical',
+        body: appendEscalationHint('4 days cover. No inbound confirmed.', { module: 'Inventory Monitoring', agent: 'Inventory Agent', alert: '4 days cover. No inbound confirmed.' }),
+        moduleLabel: 'Inventory',
+        moduleId: inventoryNavIds.fg,
+        category: 'inventory',
+        timeAgo: '4 min ago',
+        read: false,
+      },
+      {
+        id: 'n2',
+        severity: 'CRITICAL',
+        title: 'Wiring Harness PO Overdue',
+        body: appendEscalationHint('PO-2026-0036 past due date. Chennai Cable not acknowledged.', { module: 'Purchase Orders', alert: 'PO-2026-0036 past due date.' }),
+        moduleLabel: 'Purchase Orders',
+        moduleId: PURCHASE_ORDERS_ID,
+        category: 'purchase',
+        timeAgo: '12 min ago',
+        read: false,
+      },
+      {
+        id: 'n3',
+        severity: 'HIGH',
+        title: 'Shipment SHP-30531 Stuck',
+        body: appendEscalationHint('CN Rail mechanical issue. Toronto yard. 48hr delay.', { module: 'Fulfillment Monitoring', agent: 'Fulfillment Agent' }),
+        moduleLabel: 'Fulfillment',
+        moduleId: 'fulfillment',
+        category: 'fulfillment',
+        timeAgo: '2 min ago',
+        read: false,
+      },
+      {
+        id: 'n4',
+        severity: 'HIGH',
+        title: 'Shenzhen Supplier Risk',
+        body: appendEscalationHint('OTIF dropped to 94.2%. 3 stuck shipments. Battery packs at 14 days.', { module: 'Supplier Tracking', agent: 'Supplier Risk Agent' }),
+        moduleLabel: 'Supplier Tracking',
+        moduleId: 'suppliers',
+        category: 'supplier',
+        timeAgo: '6 min ago',
+        read: false,
+      },
+      {
+        id: 'n5',
+        severity: 'HIGH',
+        title: 'Detroit Metro Transit Order at Risk',
+        body: appendEscalationHint('CO-8827 due May 5. Only 3 units available, need 8.', { module: 'Customer Orders', agent: 'Order Bank Agent' }),
+        moduleLabel: 'Customer Orders',
+        moduleId: 'customer-orders',
+        category: 'customer',
+        timeAgo: '8 min ago',
+        read: false,
+      },
+      {
+        id: 'n6',
+        severity: 'MEDIUM',
+        title: 'FG-M550-MD Forecast Bias',
+        body: appendEscalationHint('Plus 3.8% bias for 3 consecutive weeks.', { module: 'Demand Forecasting', agent: 'Forecast Agent', alert: 'Plus 3.8% sustained forecast bias.' }),
+        moduleLabel: 'Demand Forecasting',
+        moduleId: 'demand',
+        category: 'demand',
+        timeAgo: '1 hr ago',
+        read: false,
+      },
+      {
+        id: 'n7',
+        severity: 'MEDIUM',
+        title: 'Tariff Exposure Alert',
+        body: appendEscalationHint('CMP-BAT-009 exposed to 145% China tariff. $16.4M PO at risk.', { module: 'Trade Risk' }),
+        moduleLabel: 'Trade Risk',
+        moduleId: 'trade-risk',
+        category: 'trade',
+        timeAgo: '2 hrs ago',
+        read: false,
+      },
+      {
+        id: 'n8',
+        severity: 'INFO',
+        title: 'MRP Run Complete',
+        body: appendEscalationHint('Nightly MRP completed successfully. 10 reorder suggestions generated.', {
+          module: 'Supply Planning',
+          alert: 'Nightly MRP completed successfully. 10 reorder suggestions generated.',
+        }),
+        moduleLabel: 'Supply Planning',
+        moduleId: 'planning',
+        category: 'planning',
+        timeAgo: '6 hrs ago',
+        read: false,
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'n1',
+      severity: 'CRITICAL',
+      title: 'Drive Axle Wheel Assembly — Line Stoppage Risk',
+      body: appendEscalationHint(
+        'CMP-WHL-DRV at 4 days supply. 14 units remaining. Reorder overdue 8 days. Detroit Wheel Systems PO not acknowledged. Op. Rodriguez submitted urgent request 22 min ago. Line 1 stoppage in approximately 4 days.',
+        { module: 'Supply Planning', agent: 'Supply Planning Agent', alert: 'Reorder overdue supplier PO shortage line stoppage risk.' }
+      ),
+      moduleLabel: 'Supply Planning',
+      moduleId: 'planning',
+      category: 'planning',
+      timeAgo: '22 minutes ago',
+      read: false,
+    },
+    {
+      id: 'n2',
+      severity: 'CRITICAL',
+      title: 'Supplier Short Ship — Detroit Wheel Systems',
+      body: appendEscalationHint(
+        'PO-2026-0037 received 12 units against 24 ordered. Short ship of 12 units contributed to current critical shortage. Supplier contact required.',
+        { module: 'Receiving', agent: 'Receiving Agent' }
+      ),
+      moduleLabel: 'Receiving',
+      moduleId: 'receiving',
+      category: 'inventory',
+      timeAgo: '2 days ago',
+      read: false,
+    },
+    {
+      id: 'n3',
+      severity: 'HIGH',
+      title: 'WO-4424 at Risk — Missing Drive Axle Wheels',
+      body: appendEscalationHint(
+        'Work order for Regional Cab-Over Truck pending shortage. Drive axle wheel assembly required by 2:00 PM today. Only 2 units at station.',
+        { module: 'Inventory Monitoring', agent: 'Inventory Agent', alert: 'parts shortage workstation' }
+      ),
+      moduleLabel: 'Shop Floor',
+      moduleId: 'shop-floor',
+      category: 'inventory',
+      timeAgo: '35 minutes ago',
+      read: false,
+    },
+    {
+      id: 'n4',
+      severity: 'HIGH',
+      title: 'Shenzhen Supplier Risk',
+      body: appendEscalationHint('OTIF dropped to 94.2%. 3 stuck shipments. Battery packs at 14 days.', { module: 'Supplier Tracking', agent: 'Supplier Risk Agent' }),
+      moduleLabel: 'Supplier Tracking',
+      moduleId: 'suppliers',
+      category: 'supplier',
+      timeAgo: '6 min ago',
+      read: false,
+    },
+    {
+      id: 'n5',
+      severity: 'HIGH',
+      title: 'Detroit Metro Transit Order at Risk',
+      body: appendEscalationHint('CO-8827 due May 5. Only 3 units available, need 8.', { module: 'Customer Orders', agent: 'Order Bank Agent' }),
+      moduleLabel: 'Customer Orders',
+      moduleId: 'customer-orders',
+      category: 'customer',
+      timeAgo: '8 min ago',
+      read: false,
+    },
+    {
+      id: 'n6',
+      severity: 'MEDIUM',
+      title: 'FG-M550-MD Forecast Bias',
+      body: appendEscalationHint('Plus 3.8% bias for 3 consecutive weeks.', { module: 'Demand Forecasting', agent: 'Forecast Agent', alert: 'Plus 3.8% sustained forecast bias.' }),
+      moduleLabel: 'Demand Forecasting',
+      moduleId: 'demand',
+      category: 'demand',
+      timeAgo: '1 hr ago',
+      read: false,
+    },
+    {
+      id: 'n7',
+      severity: 'MEDIUM',
+      title: 'Tariff Exposure Alert',
+      body: appendEscalationHint('CMP-BAT-009 exposed to 145% China tariff. $16.4M PO at risk.', { module: 'Trade Risk' }),
+      moduleLabel: 'Trade Risk',
+      moduleId: 'trade-risk',
+      category: 'trade',
+      timeAgo: '2 hrs ago',
+      read: false,
+    },
+    {
+      id: 'n8',
+      severity: 'INFO',
+      title: 'MRP Run Complete',
+      body: appendEscalationHint('Nightly MRP completed successfully. 10 reorder suggestions generated.', {
+        module: 'Supply Planning',
+        alert: 'Nightly MRP completed successfully. 10 reorder suggestions generated.',
+      }),
+      moduleLabel: 'Supply Planning',
+      moduleId: 'planning',
+      category: 'planning',
+      timeAgo: '6 hrs ago',
+      read: false,
+    },
+  ];
 }
 
 function DashboardApp({ name, roleId, onSwitchRole }) {
@@ -234,6 +437,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     lastManualUpload,
     isModuleDirty,
     saveAllChanges,
+    demoScenario,
   } = useDashboardData();
 
   const dataBundle = useMemo(
@@ -268,20 +472,10 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
   const displayName = (name && name.trim()) || roleLabel;
   const welcome = `Welcome back, ${displayName} · ${roleLabel}`;
 
-  const [notifications, setNotifications] = useState(() => {
-    const seeded = [
-      ...defaultNotificationsFromAgents(agentAlerts),
-      { id: 'n1', severity: 'CRITICAL', title: 'FG-R450-CO Stock Critical', body: '4 days cover. No inbound confirmed.', moduleLabel: 'Inventory', moduleId: inventoryNavIds.fg, category: 'inventory', timeAgo: '4 min ago', read: false },
-      { id: 'n2', severity: 'CRITICAL', title: 'Wiring Harness PO Overdue', body: 'PO-2026-0036 past due date. Chennai Cable not acknowledged.', moduleLabel: 'Purchase Orders', moduleId: PURCHASE_ORDERS_ID, category: 'purchase', timeAgo: '12 min ago', read: false },
-      { id: 'n3', severity: 'HIGH', title: 'Shipment SHP-30531 Stuck', body: 'CN Rail mechanical issue. Toronto yard. 48hr delay.', moduleLabel: 'Fulfillment', moduleId: 'fulfillment', category: 'fulfillment', timeAgo: '2 min ago', read: false },
-      { id: 'n4', severity: 'HIGH', title: 'Shenzhen Supplier Risk', body: 'OTIF dropped to 94.2%. 3 stuck shipments. Battery packs at 14 days.', moduleLabel: 'Supplier Tracking', moduleId: 'suppliers', category: 'supplier', timeAgo: '6 min ago', read: false },
-      { id: 'n5', severity: 'HIGH', title: 'Detroit Metro Transit Order at Risk', body: 'CO-8827 due May 5. Only 3 units available, need 8.', moduleLabel: 'Customer Orders', moduleId: 'customer-orders', category: 'customer', timeAgo: '8 min ago', read: false },
-      { id: 'n6', severity: 'MEDIUM', title: 'FG-M550-MD Forecast Bias', body: 'Plus 3.8% bias for 3 consecutive weeks.', moduleLabel: 'Demand Forecasting', moduleId: 'demand', category: 'demand', timeAgo: '1 hr ago', read: false },
-      { id: 'n7', severity: 'MEDIUM', title: 'Tariff Exposure Alert', body: 'CMP-BAT-009 exposed to 145% China tariff. $16.4M PO at risk.', moduleLabel: 'Trade Risk', moduleId: 'trade-risk', category: 'trade', timeAgo: '2 hrs ago', read: false },
-      { id: 'n8', severity: 'INFO', title: 'MRP Run Complete', body: 'Nightly MRP completed successfully. 10 reorder suggestions generated.', moduleLabel: 'Supply Planning', moduleId: 'planning', category: 'planning', timeAgo: '6 hrs ago', read: false },
-    ];
-    return seeded;
-  });
+  const [notifications, setNotifications] = useState(() => [
+    ...defaultNotificationsFromAgents(agentAlerts),
+    ...cannedDemoNotifications(demoScenario),
+  ]);
 
   useEffect(() => {
     const generated = defaultNotificationsFromAgents(agentAlerts);
@@ -392,7 +586,10 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
           id: `mrp-${Date.now()}`,
           severity: 'INFO',
           title: 'MRP Run Complete — 10 suggestions generated',
-          body: 'Nightly MRP completed and refreshed purchase planning outputs.',
+          body: appendEscalationHint('Nightly MRP completed and refreshed purchase planning outputs.', {
+            module: 'Supply Planning',
+            alert: 'Nightly MRP completed successfully. 10 reorder suggestions generated.',
+          }),
           moduleLabel: 'Supply Planning',
           moduleId: PURCHASE_ORDERS_ID,
           category: 'planning',

@@ -17,14 +17,15 @@ import {
   agentAlerts as initAgentAlerts,
   contactDirectory as initContactDirectory,
 } from '../data/sampleData';
+import { agentAlertsClean, neutralizeComponentDataForCleanSample } from '../data/demoCleanSample';
 import { RIVIT_ADJUSTMENTS_KEY } from '../constants/demoStorageKeys';
 import { buildPartsMovementSeedHistory } from '../data/partsMovementHistorySeed';
+import { readInitialDemoScenario } from '../utils/demoScenarioBoot';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-/** Frozen snapshots for computing inventory patches vs sample data */
+/** Default snapshots for uploads / patch logic (crisis sample from repo) */
 const INIT_SKU_SNAPSHOT = clone(initSku);
-const INIT_COMP_SNAPSHOT = clone(initComponent);
 const INIT_CLASS_BC_SNAPSHOT = clone(initClassBc);
 
 function applyClassBcPatches(baseRows, patches) {
@@ -102,11 +103,19 @@ export const MODULE_IDS = {
 export function DashboardDataProvider({ children }) {
   const adjPayload = readRivitAdjustmentsPayload();
 
+  const [demoScenario] = useState(() => readInitialDemoScenario());
+
+  const componentBaseline = useMemo(() => {
+    return demoScenario === 'clean'
+      ? neutralizeComponentDataForCleanSample(clone(initComponent))
+      : clone(initComponent);
+  }, [demoScenario]);
+
   const [skuData, setSkuData] = useState(() =>
     applySkuPatches(clone(initSku), adjPayload?.skuPatches)
   );
   const [componentData, setComponentData] = useState(() =>
-    applyComponentPatches(clone(initComponent), adjPayload?.componentPatches)
+    applyComponentPatches(clone(componentBaseline), adjPayload?.componentPatches)
   );
   const [classBcPartsData, setClassBcPartsData] = useState(() =>
     applyClassBcPatches(clone(initClassBc), adjPayload?.classBcPatches)
@@ -115,13 +124,15 @@ export function DashboardDataProvider({ children }) {
   const [shipmentData, setShipmentData] = useState(() => clone(initShipment));
   const [orderHistory, setOrderHistory] = useState(() => clone(initOrderHistory));
   const [customerOrderData, setCustomerOrderData] = useState(() => clone(initCustomerOrder));
-  const [agentAlerts, setAgentAlerts] = useState(() => clone(initAgentAlerts));
+  const [agentAlerts, setAgentAlerts] = useState(() =>
+    clone(demoScenario === 'clean' ? agentAlertsClean : initAgentAlerts)
+  );
   const [contactDirectory] = useState(() => clone(initContactDirectory));
   const [dirtyModules, setDirtyModules] = useState(() => new Set());
   const [adjustmentHistory, setAdjustmentHistory] = useState(() =>
     adjPayload?.adjustmentHistory?.length
       ? reviveAdjustmentHistory(adjPayload.adjustmentHistory)
-      : buildPartsMovementSeedHistory()
+      : buildPartsMovementSeedHistory(demoScenario)
   );
   const [lastManualUpload, setLastManualUpload] = useState({
     message: 'Using sample data',
@@ -239,7 +250,7 @@ export function DashboardDataProvider({ children }) {
     });
     const componentPatches = {};
     componentData.forEach((row) => {
-      const init = INIT_COMP_SNAPSHOT.find((x) => x.sku === row.sku);
+      const init = componentBaseline.find((x) => x.sku === row.sku);
       if (!init) return;
       if (row.onHand !== init.onHand || row.extended !== init.extended) {
         componentPatches[row.sku] = { onHand: row.onHand, extended: row.extended };
@@ -271,7 +282,7 @@ export function DashboardDataProvider({ children }) {
     } catch {
       /* ignore quota */
     }
-  }, [skuData, componentData, classBcPartsData, adjustmentHistory]);
+  }, [skuData, componentData, classBcPartsData, adjustmentHistory, componentBaseline]);
 
   const value = useMemo(
     () => ({
@@ -292,6 +303,7 @@ export function DashboardDataProvider({ children }) {
       agentAlerts,
       setAgentAlerts,
       contactDirectory,
+      demoScenario,
       markModuleDirty,
       clearModuleDirty,
       saveAllChanges,
@@ -316,6 +328,7 @@ export function DashboardDataProvider({ children }) {
       customerOrderData,
       agentAlerts,
       contactDirectory,
+      demoScenario,
       markModuleDirty,
       clearModuleDirty,
       saveAllChanges,

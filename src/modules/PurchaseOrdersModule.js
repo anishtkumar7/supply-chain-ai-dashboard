@@ -16,6 +16,7 @@ import { useExportRegistration } from '../context/ExportRegistrationContext';
 import { PURCHASE_ORDERS_ID } from '../config/roleNavConfig';
 import { purchaseOrderTrackerRows } from '../utils/exportUtils';
 import { RIVIT_POS_KEY } from '../constants/demoStorageKeys';
+import { PO_NUMBERS_CRISIS_ONLY } from '../data/demoCleanSample';
 
 const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const SHORT_CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 });
@@ -47,6 +48,17 @@ const MONTHLY_PO_VOLUME = [
 ];
 
 const INITIAL_POS = [
+  {
+    poNumber: 'PO-2026-0043',
+    componentSku: 'CMP-WHL-DRV',
+    supplier: 'Detroit Wheel Systems',
+    qty: 24,
+    poValue: 74880,
+    requiredBy: '2026-04-28',
+    status: 'OVERDUE',
+    supplierAcknowledgment: 'Not acknowledged',
+    createdAt: '2026-04-28',
+  },
   {
     poNumber: 'PO-2026-0036',
     componentSku: 'CMP-WRH-004',
@@ -153,6 +165,11 @@ function statusBadge(status) {
   );
 }
 
+function crisisAwareInitialPos(demoScenario) {
+  if (demoScenario === 'clean') return INITIAL_POS.filter((p) => !PO_NUMBERS_CRISIS_ONLY.has(p.poNumber));
+  return INITIAL_POS;
+}
+
 function mergePurchaseOrders(sample, savedList) {
   if (!savedList || !Array.isArray(savedList)) return [...sample];
   const map = new Map();
@@ -161,13 +178,14 @@ function mergePurchaseOrders(sample, savedList) {
   return [...map.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
-function loadMergedPurchaseOrders() {
+function loadMergedPurchaseOrders(demoScenario) {
+  const sample = crisisAwareInitialPos(demoScenario);
   try {
     const raw = window.localStorage.getItem(RIVIT_POS_KEY);
     const saved = raw ? JSON.parse(raw) : null;
-    return mergePurchaseOrders(INITIAL_POS, saved);
+    return mergePurchaseOrders(sample, saved);
   } catch {
-    return [...INITIAL_POS];
+    return [...sample];
   }
 }
 
@@ -197,7 +215,7 @@ function createDraftEmail(po, componentDescription) {
 }
 
 export function PurchaseOrdersModule({ onComposeEmail }) {
-  const { componentData, supplierData } = useDashboardData();
+  const { componentData, supplierData, demoScenario } = useDashboardData();
   const today = ymd(new Date());
   const horizonDate = addDays(today, 30);
 
@@ -211,7 +229,7 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
   );
 
   const [dismissedSuggestions, setDismissedSuggestions] = useState([]);
-  const [openPos, setOpenPos] = useState(loadMergedPurchaseOrders);
+  const [openPos, setOpenPos] = useState(() => loadMergedPurchaseOrders(demoScenario));
   const [toast, setToast] = useState('');
   const [viewModalPo, setViewModalPo] = useState(null);
   const [poTrackerSearch, setPoTrackerSearch] = useState('');
@@ -266,6 +284,7 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
       .filter((c) => !dismissedSuggestions.includes(c.sku))
       .map((c) => {
         const supplier = supplierByName.get(c.supplier);
+        const suggestedQty = c.sku === 'CMP-WHL-DRV' && c.health === 'CRITICAL' ? 24 : c.eoq;
         const expectedDelivery = addDays(c.reorderDate, supplier?.leadDays || 0);
         return {
           id: `suggestion-${c.sku}`,
@@ -273,15 +292,22 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
           description: c.description,
           drivesFG: c.drivesFG,
           supplier: c.supplier,
-          suggestedQty: c.eoq,
-          suggestedOrderDate: c.reorderDate,
+          suggestedQty,
+          suggestedOrderDate: c.sku === 'CMP-WHL-DRV' && c.health === 'CRITICAL' ? 'IMMEDIATE' : c.reorderDate,
           expectedDelivery,
-          estimatedValue: c.eoq * c.unitCost,
+          estimatedValue: suggestedQty * c.unitCost,
           urgency: urgencyForReorderDate(c.reorderDate, today),
           unitCost: c.unitCost,
         };
       })
-      .sort((a, b) => toDate(a.suggestedOrderDate) - toDate(b.suggestedOrderDate));
+      .sort((a, b) => {
+        if (a.sku === 'CMP-WHL-DRV' && a.urgency === 'CRITICAL') return -1;
+        if (b.sku === 'CMP-WHL-DRV' && b.urgency === 'CRITICAL') return 1;
+        const urgencyRank = { CRITICAL: 3, HIGH: 2, MEDIUM: 1 };
+        const rankDiff = (urgencyRank[b.urgency] || 0) - (urgencyRank[a.urgency] || 0);
+        if (rankDiff !== 0) return rankDiff;
+        return toDate(a.suggestedOrderDate) - toDate(b.suggestedOrderDate);
+      });
   }, [componentData, dismissedSuggestions, horizonDate, supplierByName, today]);
 
   const normalizedRows = useMemo(
@@ -667,7 +693,10 @@ export function PurchaseOrdersModule({ onComposeEmail }) {
             </thead>
             <tbody>
               {filteredTrackerRows.map((po) => (
-                <tr key={po.poNumber}>
+                <tr
+                  key={po.poNumber}
+                  style={po.poNumber === 'PO-2026-0043' ? { borderLeft: '3px solid rgba(248,113,113,0.75)', background: 'rgba(127,29,29,0.15)' } : undefined}
+                >
                   <td>{po.poNumber}</td>
                   <td>
                     <div>{po.componentSku}</div>

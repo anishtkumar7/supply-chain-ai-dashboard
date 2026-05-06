@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { classBCData } from '../data/sampleData';
+import { REPLENISHMENT_SEED_CLEAN } from '../data/demoCleanSample';
 import { getAdjustmentRowsForSku } from '../data/partsMovementHistorySeed';
 import { daysCoverFromWks, isFgLowStockByDaysCover } from '../utils/coverageDisplay';
 import { RIVIT_MC_REPLENISHMENT_QUEUE_KEY } from '../constants/demoStorageKeys';
@@ -37,12 +38,13 @@ const WRITE_OFF_REASONS = [
   'Cycle count adjustment',
 ];
 
-const REPLENISHMENT_SEED = [
-  { id: 'rq-1', minsAgo: 8, line: 'Line 1', station: 'Station 4', sku: 'CMP-RBR-GRM-12', description: 'Rubber Grommet 1/2 inch', inventoryClass: 'C', qtyRequested: 200, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
-  { id: 'rq-2', minsAgo: 12, line: 'Line 1', station: 'Station 4', sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly 13L', inventoryClass: 'A', qtyRequested: 2, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
-  { id: 'rq-3', minsAgo: 24, line: 'Line 2', station: 'Station 7', sku: 'CMP-M10-FLN', description: 'M10 Flange Nut', inventoryClass: 'C', qtyRequested: 500, urgency: 'NORMAL', requestedBy: 'Op. Chen', status: 'ACKNOWLEDGED' },
-  { id: 'rq-4', minsAgo: 45, line: 'Line 1', station: 'Station 4', sku: 'CMP-CBL-TIE', description: 'Cable Tie 200mm', inventoryClass: 'C', qtyRequested: 300, urgency: 'NORMAL', requestedBy: 'Op. Rodriguez', status: 'DISPATCHED' },
-  { id: 'rq-5', minsAgo: 60, line: 'Line 3', station: 'Station 2', sku: 'CMP-BRK-CAL', description: 'Brake Caliper Assembly', inventoryClass: 'B', qtyRequested: 4, urgency: 'NORMAL', requestedBy: 'Op. Williams', status: 'DELIVERED' },
+const REPLENISHMENT_SEED_CRISIS = [
+  { id: 'rq-1', minsAgo: 22, line: 'Line 1', station: 'Station 4', sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel and Tire Assembly 11R22.5', inventoryClass: 'A', qtyRequested: 8, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
+  { id: 'rq-2', minsAgo: 35, line: 'Line 1', station: 'Station 4', sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel and Tire Assembly — MC checked system: only 14 in factory total, none confirmed inbound', inventoryClass: 'A', qtyRequested: 4, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'ACKNOWLEDGED' },
+  { id: 'rq-3', minsAgo: 8, line: 'Line 1', station: 'Station 4', sku: 'CMP-RBR-GRM-12', description: 'Rubber Grommet 1/2 inch', inventoryClass: 'C', qtyRequested: 200, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
+  { id: 'rq-4', minsAgo: 24, line: 'Line 2', station: 'Station 7', sku: 'CMP-M10-FLN', description: 'M10 Flange Nut', inventoryClass: 'C', qtyRequested: 500, urgency: 'NORMAL', requestedBy: 'Op. Chen', status: 'ACKNOWLEDGED' },
+  { id: 'rq-5', minsAgo: 45, line: 'Line 1', station: 'Station 4', sku: 'CMP-CBL-TIE', description: 'Cable Tie 200mm', inventoryClass: 'C', qtyRequested: 300, urgency: 'NORMAL', requestedBy: 'Op. Rodriguez', status: 'DISPATCHED' },
+  { id: 'rq-6', minsAgo: 60, line: 'Line 3', station: 'Station 2', sku: 'CMP-BRK-CAL', description: 'Brake Caliper Assembly', inventoryClass: 'B', qtyRequested: 4, urgency: 'NORMAL', requestedBy: 'Op. Williams', status: 'DELIVERED' },
 ];
 
 const fieldFull = { width: '100%', maxWidth: '100%', marginTop: 4, display: 'block' };
@@ -180,9 +182,13 @@ function parseLineStation(stationId) {
   return { line: raw, station: 'Station 1' };
 }
 
-function seedQueueRows() {
+function replenishmentSeedForScenario(demoScenario) {
+  return demoScenario === 'clean' ? REPLENISHMENT_SEED_CLEAN : REPLENISHMENT_SEED_CRISIS;
+}
+
+function seedQueueRows(demoScenario) {
   const now = Date.now();
-  return REPLENISHMENT_SEED.map((r) => ({
+  return replenishmentSeedForScenario(demoScenario).map((r) => ({
     ...r,
     createdAt: new Date(now - r.minsAgo * 60000).toISOString(),
   }));
@@ -199,6 +205,7 @@ function BlueprintLink({ sku }) {
 
 export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
   const {
+    demoScenario,
     skuData,
     setSkuData,
     componentData,
@@ -254,7 +261,7 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
     try {
       const raw = window.localStorage.getItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY);
       if (!raw) {
-        const seeded = seedQueueRows();
+        const seeded = seedQueueRows(demoScenario);
         setQueueRows(seeded);
         window.localStorage.setItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY, JSON.stringify(seeded));
         return seeded;
@@ -278,7 +285,7 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
           status,
         };
       });
-      const seededById = new Map(seedQueueRows().map((x) => [x.id, x]));
+      const seededById = new Map(seedQueueRows(demoScenario).map((x) => [x.id, x]));
       normalized.forEach((r) => seededById.set(r.id, r));
       const merged = Array.from(seededById.values()).sort(
         (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -287,11 +294,11 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
       window.localStorage.setItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY, JSON.stringify(merged));
       return merged;
     } catch {
-      const seeded = seedQueueRows();
+      const seeded = seedQueueRows(demoScenario);
       setQueueRows(seeded);
       return seeded;
     }
-  }, []);
+  }, [demoScenario]);
 
   useEffect(() => {
     hydrateQueueFromStorage();
@@ -342,7 +349,7 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
 
     /** Canonical demo movements + anything saved from transfers / write-ons / write-offs (localStorage). */
     const mergeSeedAndPersisted = (sku) => {
-      const seed = getAdjustmentRowsForSku(sku);
+      const seed = getAdjustmentRowsForSku(sku, demoScenario);
       const persisted = sorted.filter((h) => h.part === sku);
       const map = new Map();
       for (const r of seed) map.set(rowKey(r), r);
@@ -358,7 +365,7 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
       if (!newestByPart.has(row.part)) newestByPart.set(row.part, row);
     }
     return Array.from(newestByPart.values()).sort((a, b) => new Date(b.at) - new Date(a.at));
-  }, [history, selected]);
+  }, [history, selected, demoScenario]);
 
   const merged = useMemo(() => {
     if (!q.trim()) return { fg: [], comp: [], bc: [] };
@@ -799,7 +806,14 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
                         {r.status === 'PENDING' && (
                           <>
                             <button type="button" className="btn btn--green" style={{ background: 'rgba(8,145,178,0.22)', borderColor: 'rgba(34,211,238,0.5)', color: '#67e8f9' }} onClick={() => updateQueueStatus(r.id, 'ACKNOWLEDGED')}>Acknowledge</button>
-                            <button type="button" className="btn btn--danger" onClick={() => openCannotFulfill(r)}>Cannot Fulfill</button>
+                            <button
+                              type="button"
+                              className="btn btn--danger"
+                              style={r.sku === 'CMP-WHL-DRV' ? { boxShadow: '0 0 0 2px rgba(248,113,113,0.35)' } : undefined}
+                              onClick={() => openCannotFulfill(r)}
+                            >
+                              Cannot Fulfill
+                            </button>
                           </>
                         )}
                         {r.status === 'ACKNOWLEDGED' && (
@@ -1146,6 +1160,9 @@ export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
               <input type="checkbox" checked={cannotNotifySupervisor} onChange={() => setCannotNotifySupervisor((v) => !v)} />
               {' '}Notify Line Supervisor
             </label>
+            <p className="panel__meta" style={{ marginTop: 10, lineHeight: 1.45 }}>
+              Submitting records the cannot-fulfill escalation and notifies Procurement: the Senior Buyer is included for supplier recovery, expedites, and substitute paths (not Planning).
+            </p>
             <button type="button" className="modal-card__action" onClick={submitCannotFulfill} style={{ marginTop: 10 }}>Submit</button>
             <button type="button" className="modal-card__action" onClick={() => setCannotFulfillRow(null)} style={{ marginTop: 6 }}>Cancel</button>
           </div>

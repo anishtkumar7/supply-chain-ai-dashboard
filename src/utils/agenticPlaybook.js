@@ -19,11 +19,11 @@ export function agentDisplayNameToId(name) {
 /** Mirrors AIAgentsModule.actionOptionsForAgent when alert is present */
 export function playbookActionsForAgentId(agentId) {
   const map = {
-    'inventory-agent': ['Create Reorder Request', 'Notify Planner', 'View SKU Detail'],
+    'inventory-agent': ['Create Reorder Request', 'Notify Buyer', 'View SKU Detail'],
     'supply-planning-agent': ['Draft PO for Approval', 'Expedite Existing PO', 'Notify Buyer'],
     'fulfillment-agent': ['Escalate to Carrier', 'Request Air Freight Quote', 'Notify Customer Service'],
     'supplier-risk-agent': ['Find Alternate Supplier', 'Expedite Current Order', 'Escalate to Procurement Manager'],
-    'order-bank-agent': ['Notify Customer of Delay', 'Pull Forward Inventory', 'Escalate to Planner'],
+    'order-bank-agent': ['Notify Customer of Delay', 'Pull Forward Inventory', 'Escalate to Buyer'],
     'forecast-agent': ['Adjust Forecast', 'Flag for Planner Review', 'Update Demand Plan'],
   };
   return map[agentId] || ['Review Alert', 'Notify Owner', 'Open Module Detail'];
@@ -31,11 +31,11 @@ export function playbookActionsForAgentId(agentId) {
 
 function ownerForAgentId(agentId) {
   const m = {
-    'inventory-agent': 'Materials / Planner',
-    'supply-planning-agent': 'Buyer / Planner',
+    'inventory-agent': 'Procurement / Buyer',
+    'supply-planning-agent': 'Buyer / Supply Planning',
     'fulfillment-agent': 'Logistics',
     'supplier-risk-agent': 'Procurement',
-    'order-bank-agent': 'Customer Ops',
+    'order-bank-agent': 'Customer Ops · Buyer',
     'forecast-agent': 'Demand Planning',
   };
   return m[agentId] || 'Operations';

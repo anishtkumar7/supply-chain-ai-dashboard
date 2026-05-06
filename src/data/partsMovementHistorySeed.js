@@ -1,4 +1,6 @@
-import { partMovementHistory } from './sampleData';
+import { componentData, partMovementHistory } from './sampleData';
+import { exportedEntriesForSequencedRow, hashSku } from './partMovementHistoryBuilder';
+import { getNeutralCmpWhlDrvStoryRow } from './demoCleanSample';
 
 function timeLabelAt(at) {
   const d = at instanceof Date ? at : new Date(at);
@@ -11,9 +13,18 @@ function timeLabelAt(at) {
   });
 }
 
+function entriesForSkuInScenario(sku, demoScenario = 'crisis') {
+  if (demoScenario === 'clean' && sku === 'CMP-WHL-DRV') {
+    const desc =
+      componentData.find((c) => c.sku === 'CMP-WHL-DRV')?.description || 'Drive Axle Wheel & Tire Assembly 11R22.5';
+    return exportedEntriesForSequencedRow(getNeutralCmpWhlDrvStoryRow(desc), hashSku('CMP-WHL-DRV'));
+  }
+  return partMovementHistory[sku];
+}
+
 /** Fallback rows when persisted adjustmentHistory does not contain this SKU (legacy / cleared partial saves). */
-export function getAdjustmentRowsForSku(sku) {
-  const entries = partMovementHistory[sku];
+export function getAdjustmentRowsForSku(sku, demoScenario = 'crisis') {
+  const entries = entriesForSkuInScenario(sku, demoScenario);
   if (!Array.isArray(entries) || entries.length === 0) return [];
   return entries
     .map((entry, i) => {
@@ -35,12 +46,12 @@ export function getAdjustmentRowsForSku(sku) {
 }
 
 /** Flatten `partMovementHistory` into legacy adjustment rows for Parts Inventory (part, quantity, at, …). */
-export function buildPartsMovementSeedHistory() {
+export function buildPartsMovementSeedHistory(demoScenario = 'crisis') {
   const out = [];
   let seq = 0;
 
   for (const sku of Object.keys(partMovementHistory)) {
-    const entries = partMovementHistory[sku];
+    const entries = entriesForSkuInScenario(sku, demoScenario);
     if (!Array.isArray(entries)) continue;
     for (const entry of entries) {
       const at = entry.timestamp ? new Date(entry.timestamp) : new Date();

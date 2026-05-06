@@ -1,6 +1,7 @@
 import { ResponsiveContainer, LineChart, Line, Tooltip } from 'recharts';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { computeExecutiveSummary } from '../utils/executiveSummaryMetrics';
+import { primaryEscalationHintFromAgentAlert } from '../utils/escalationContactHint';
 import { daysCoverFromWks } from '../utils/coverageDisplay';
 
 function skuPillClass(status) {
@@ -162,7 +163,10 @@ export function ExecutiveCommandCenterModule() {
               </span>
               <span className="fact-list__k">{item.module}</span>
               <span className="fact-list__v" style={{ textAlign: 'left', maxWidth: '100%' }}>
-                {item.alert}
+                <span style={{ display: 'block' }}>{item.alert}</span>
+                <span className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+                  {primaryEscalationHintFromAgentAlert(item)}
+                </span>
               </span>
             </li>
           ))}
