@@ -16,7 +16,7 @@ export function RoleLogin({ initialName, initialRoleId, onEnter }) {
     'mfg-engineer',
     'warehouse',
     'management',
-    null,
+    'operator',
     'admin',
     null,
   ];

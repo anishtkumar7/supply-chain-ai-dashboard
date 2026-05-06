@@ -204,6 +204,84 @@ function buildCmpDockStoryCompact(row, tier, h) {
   return events;
 }
 
+/** Sequenced Class A components: receipts in 12-24 batches, then WO-position deliveries of 1-2 units. */
+function buildSequencedClassAStory(row, h) {
+  const onHand = Math.max(0, Math.floor(Number(row.onHand) || 0));
+  if (onHand === 0) return [];
+
+  const issueTotal = Math.max(4, Math.min(18, 6 + (h % 13)));
+  const receiptTotal = onHand + issueTotal;
+  const nReceipts = receiptTotal > 24 ? 2 : 1;
+  const recv = nReceipts === 2 ? allocateInt(receiptTotal, [0.56, 0.44]) : [receiptTotal];
+  const recvBatches = recv.map((q) => Math.max(12, Math.min(24, q)));
+  let recvDiff = receiptTotal - recvBatches.reduce((a, b) => a + b, 0);
+  let i = 0;
+  while (recvDiff !== 0) {
+    const idx = i % recvBatches.length;
+    if (recvDiff > 0 && recvBatches[idx] < 24) {
+      recvBatches[idx] += 1;
+      recvDiff -= 1;
+    } else if (recvDiff < 0 && recvBatches[idx] > 12) {
+      recvBatches[idx] -= 1;
+      recvDiff += 1;
+    }
+    i += 1;
+    if (i > 200) break;
+  }
+
+  const nDeliveries = Math.max(5, Math.ceil(issueTotal / 2));
+  const del = allocateInt(issueTotal, Array.from({ length: nDeliveries }, () => 1 / nDeliveries)).map((q) =>
+    Math.max(1, Math.min(2, q))
+  );
+  let dDiff = issueTotal - del.reduce((a, b) => a + b, 0);
+  let di = 0;
+  while (dDiff !== 0) {
+    const idx = di % del.length;
+    if (dDiff > 0 && del[idx] < 2) {
+      del[idx] += 1;
+      dDiff -= 1;
+    } else if (dDiff < 0 && del[idx] > 1) {
+      del[idx] -= 1;
+      dDiff += 1;
+    }
+    di += 1;
+    if (di > 200) break;
+  }
+
+  const events = [];
+  let seq = 0;
+  const budget = recvBatches.length + del.length;
+  recvBatches.forEach((qty, ridx) => {
+    events.push({
+      type: 'Goods receipt',
+      qty,
+      reason: `Received from Supplier — ${row.supplier || supplierHeavy(h)} — +${qty} units — sequenced batch ${ridx + 1} — ${poRef(h, ridx)}`,
+      authorizedBy: AUTHORS[(h + ridx) % AUTHORS.length],
+      flagged: false,
+      at: spreadMarMay2026(seq++, budget, h),
+    });
+  });
+
+  del.forEach((qty, didx) => {
+    const wo = row.drivesFG === 'FG-V900-HD' ? 'WO-4422' : 'WO-4421';
+    const reason =
+      /WHL/i.test(row.sku)
+        ? `Sequenced delivery ${wo} — Position ${Math.min(6, didx + 1)} of 6 axles`
+        : `Sequenced delivery ${wo} — Unit ${Math.min(12, didx + 1)} of 12 scheduled this week`;
+    events.push({
+      type: 'Sequenced Delivery',
+      qty: -qty,
+      reason,
+      authorizedBy: AUTHORS[(h + didx + 2) % AUTHORS.length],
+      flagged: false,
+      at: spreadMarMay2026(seq++, budget, h),
+    });
+  });
+
+  events.sort((a, b) => new Date(a.at) - new Date(b.at));
+  return events;
+}
+
 /** Finished goods: 4–6 rows — production, internal transfers, order commitment (ATP) */
 function buildFgStory(row, h) {
   const onHand = Math.max(0, Math.floor(Number(row.onHand) || 0));
@@ -465,7 +543,7 @@ export function buildPartMovementHistory(skuRows, componentRows, classBCRows) {
 
   for (const row of componentRows) {
     const h = hashSku(row.sku);
-    const raw = buildCmpDockStoryCompact(row, 'class-a', h);
+    const raw = row.sequenced ? buildSequencedClassAStory(row, h) : buildCmpDockStoryCompact(row, 'class-a', h);
     out[row.sku] = toExportEntries(raw, row.sku, row.description, h);
   }
 

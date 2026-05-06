@@ -5,6 +5,7 @@ export const PURCHASE_ORDERS_ID = 'purchase-orders';
 export const CONTACTS_ID = 'contacts';
 export const RECEIVING_ID = 'receiving';
 export const SHOP_FLOOR_ID = 'shop-floor';
+export const MY_WORK_STATION_ID = 'my-work-station';
 export const ATTENTION_QUEUE_ID = 'attention-queue';
 export const AGENTIC_PLAYBOOK_ID = 'agentic-playbook';
 
@@ -31,6 +32,10 @@ const byId = new Map([
   [
     SHOP_FLOOR_ID,
     { id: SHOP_FLOOR_ID, label: 'Shop Floor', shortLabel: 'Floor' },
+  ],
+  [
+    MY_WORK_STATION_ID,
+    { id: MY_WORK_STATION_ID, label: 'My Work Station', shortLabel: 'Station' },
   ],
   [
     ATTENTION_QUEUE_ID,
@@ -77,6 +82,7 @@ export const ROLES = {
       { type: 'fulfillment-group', parentId: 'fulfillment', children: [RECEIVING_ID, SHOP_FLOOR_ID] },
       { type: 'item', id: 'demand' },
       { type: 'planning-group', parentId: 'planning', children: [PURCHASE_ORDERS_ID] },
+      { type: 'item', id: MY_WORK_STATION_ID },
       { type: 'item', id: 'agents' },
       { type: 'item', id: CONTACTS_ID },
       { type: 'item', id: 'data-sync' },
@@ -184,6 +190,16 @@ export const ROLES = {
     ],
     defaultActive: SHOP_FLOOR_ID,
   },
+  operator: {
+    id: 'operator',
+    label: 'Operator',
+    segments: [
+      { type: 'item', id: MY_WORK_STATION_ID },
+      { type: 'item', id: 'agents' },
+      { type: 'item', id: CONTACTS_ID },
+    ],
+    defaultActive: MY_WORK_STATION_ID,
+  },
 };
 
 export const ROLE_CARDS = [
@@ -228,6 +244,12 @@ export const ROLE_CARDS = [
     icon: '🔧',
     title: 'Shop Floor Supervisor',
     description: 'Line status, work orders, shortage flags',
+  },
+  {
+    id: 'operator',
+    icon: '🧰',
+    title: 'Operator',
+    description: 'Line replenishment requests, work order status, shortage flags',
   },
 ];
 

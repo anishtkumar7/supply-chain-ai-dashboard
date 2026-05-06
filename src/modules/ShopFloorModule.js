@@ -36,6 +36,59 @@ const SHORTAGES = [
   { sku: 'CMP-WRH-004', description: 'Wiring Harness', workOrder: 'WO-4424', shortQty: 6200, daysToStop: 0 },
 ];
 
+const FLOAT_STATUS_SEED = [
+  {
+    component: 'Diesel Engine Assembly 13L',
+    sku: 'CMP-ENG-001',
+    lines: {
+      'Line 1': { count: 4, target: 6, status: 'HEALTHY' },
+      'Line 2': { count: 2, target: 6, status: 'LOW' },
+      'Line 3': null,
+      'Line 4': null,
+    },
+  },
+  {
+    component: 'Drive Axle Assembly HD',
+    sku: 'CMP-AXL-002',
+    lines: {
+      'Line 1': { count: 3, target: 4, status: 'HEALTHY' },
+      'Line 2': { count: 1, target: 4, status: 'CRITICAL' },
+      'Line 3': null,
+      'Line 4': null,
+    },
+  },
+  {
+    component: 'Wiring Harness Complete',
+    sku: 'CMP-WRH-004',
+    lines: {
+      'Line 1': { count: 2, target: 8, status: 'CRITICAL' },
+      'Line 2': { count: 5, target: 8, status: 'HEALTHY' },
+      'Line 3': null,
+      'Line 4': null,
+    },
+  },
+  {
+    component: 'EV Battery Pack 320kWh',
+    sku: 'CMP-BAT-009',
+    lines: {
+      'Line 1': null,
+      'Line 2': null,
+      'Line 3': null,
+      'Line 4': { count: 0, target: 3, status: 'CRITICAL' },
+    },
+  },
+  {
+    component: 'Power Inverter Stack EV',
+    sku: 'CMP-INV-006',
+    lines: {
+      'Line 1': null,
+      'Line 2': null,
+      'Line 3': null,
+      'Line 4': { count: 1, target: 4, status: 'LOW' },
+    },
+  },
+];
+
 const STOPPAGE_REASONS = ['Parts Shortage', 'Equipment Failure', 'Quality Hold', 'Safety Issue', 'Changeover', 'Other'];
 
 function lineStatusClass(status) {
@@ -50,12 +103,30 @@ function partsClass(state) {
   return 'pill pill--critical';
 }
 
+function floatBadgeClass(status) {
+  if (status === 'HEALTHY') return 'pill pill--healthy';
+  if (status === 'LOW') return 'pill pill--watch';
+  if (status === 'CRITICAL') return 'pill pill--critical';
+  return 'pill';
+}
+
+function deriveFloatStatus(count, target) {
+  const pct = target > 0 ? count / target : 0;
+  if (pct > 0.6) return 'HEALTHY';
+  if (pct >= 0.3) return 'LOW';
+  return 'CRITICAL';
+}
+
 export function ShopFloorModule({ onComposeEmail }) {
-  const { contactDirectory } = useDashboardData();
+  const { contactDirectory, addAdjustmentHistory } = useDashboardData();
   const [expandedWo, setExpandedWo] = useState(null);
   const [stoppageModal, setStoppageModal] = useState(null);
   const [transferModal, setTransferModal] = useState(null);
   const [plannerModal, setPlannerModal] = useState(false);
+  const [floatRows, setFloatRows] = useState(FLOAT_STATUS_SEED);
+  const [floatModal, setFloatModal] = useState(null);
+  const [floatNewCount, setFloatNewCount] = useState('');
+  const [floatUpdatedBy, setFloatUpdatedBy] = useState('');
   const [toast, setToast] = useState('');
 
   const planner = useMemo(
@@ -71,6 +142,84 @@ export function ShopFloorModule({ onComposeEmail }) {
 
   const totalPlanned = 29;
   const totalComplete = 11;
+  const floatCriticalAlerts = useMemo(() => {
+    const alerts = [];
+    floatRows.forEach((row) => {
+      ['Line 1', 'Line 2', 'Line 3', 'Line 4'].forEach((line) => {
+        const cell = row.lines[line];
+        if (cell?.status === 'CRITICAL') {
+          alerts.push({
+            id: `${row.sku}-${line}`,
+            text: `${row.component} float CRITICAL at ${line} — trucker replenishment required immediately`,
+          });
+        }
+      });
+    });
+    return alerts;
+  }, [floatRows]);
+
+  const shortageCards = useMemo(
+    () => [
+      ...SHORTAGES.map((s) => ({
+        id: s.sku,
+        title: `${s.sku} ${s.description}`,
+        detail1: `Work Order: ${s.workOrder}`,
+        detail2: `Quantity short: ${s.shortQty}`,
+        detail3: `Days until line stoppage: ${s.daysToStop === 0 ? 'line already stopped' : s.daysToStop}`,
+        sku: s.sku,
+        canActions: true,
+      })),
+      ...floatCriticalAlerts.map((a) => ({
+        id: a.id,
+        title: a.text,
+        detail1: 'Float status alert',
+        detail2: 'Trucker replenishment pending',
+        detail3: 'Escalate immediately',
+        sku: null,
+        canActions: false,
+      })),
+    ],
+    [floatCriticalAlerts]
+  );
+
+  const openFloatUpdate = (component, line, cell) => {
+    setFloatModal({ component, line, cell });
+    setFloatNewCount(String(cell.count));
+    setFloatUpdatedBy('');
+  };
+
+  const submitFloatUpdate = () => {
+    if (!floatModal) return;
+    const nextCount = Math.max(0, Math.floor(Number(floatNewCount) || 0));
+    const who = floatUpdatedBy.trim() || 'Shop Floor Operator';
+    const { component, line, cell } = floatModal;
+    const nextRows = floatRows.map((r) => {
+      if (r.sku !== component.sku) return r;
+      const current = r.lines[line];
+      if (!current) return r;
+      const nextStatus = deriveFloatStatus(nextCount, current.target);
+      return {
+        ...r,
+        lines: {
+          ...r.lines,
+          [line]: { ...current, count: nextCount, status: nextStatus },
+        },
+      };
+    });
+    setFloatRows(nextRows);
+    setFloatModal(null);
+    setToast(`Float updated — ${component.component} ${line} is now ${nextCount}/${cell.target}`);
+    addAdjustmentHistory({
+      id: `FLT-${Date.now()}`,
+      part: component.sku,
+      description: `${component.component} float at ${line}`,
+      type: 'Float Update',
+      quantity: nextCount,
+      reason: `Float count updated at ${line} to ${nextCount}/${cell.target}`,
+      authorizedBy: who,
+      flagged: false,
+    });
+  };
 
   return (
     <div className="module-grid">
@@ -101,6 +250,58 @@ export function ShopFloorModule({ onComposeEmail }) {
               </div>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="panel panel--span3">
+        <div className="panel__head">
+          <h2>Class A Component Float Status</h2>
+          <span className="panel__meta">Live float levels at each production line — truckers replenish throughout shift</span>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Line 1 Float</th>
+                <th>Line 2 Float</th>
+                <th>Line 3 Float</th>
+                <th>Line 4 Float</th>
+              </tr>
+            </thead>
+            <tbody>
+              {floatRows.map((row) => (
+                <tr key={row.sku}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{row.component}</div>
+                  </td>
+                  {['Line 1', 'Line 2', 'Line 3', 'Line 4'].map((line) => {
+                    const cell = row.lines[line];
+                    if (!cell) {
+                      return (
+                        <td key={`${row.sku}-${line}`}>
+                          <span className="pill" style={{ color: '#94a3b8', borderColor: 'rgba(148,163,184,0.35)' }}>N/A</span>
+                        </td>
+                      );
+                    }
+                    return (
+                      <td key={`${row.sku}-${line}`}>
+                        <div className="shopfloor-float-cell">
+                          <span className="mono">{cell.count}/{cell.target}</span>
+                          <span className={floatBadgeClass(cell.status)}>{cell.status}</span>
+                          {(cell.status === 'LOW' || cell.status === 'CRITICAL') && (
+                            <button type="button" className="btn btn--ghost" onClick={() => openFloatUpdate(row, line, cell)}>
+                              Update Float
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -147,15 +348,21 @@ export function ShopFloorModule({ onComposeEmail }) {
       <section className="panel panel--span3">
         <div className="panel__head"><h2>Active Shortages — Action Required</h2></div>
         <div className="shopfloor-shortages">
-          {SHORTAGES.map((s) => (
-            <article key={s.sku} className="contacts-card">
-              <strong>{s.sku} {s.description}</strong>
-              <div className="comms-meta">Work Order: {s.workOrder}</div>
-              <div className="comms-meta">Quantity short: {s.shortQty}</div>
-              <div className="comms-meta">Days until line stoppage: {s.daysToStop === 0 ? 'line already stopped' : s.daysToStop}</div>
+          {shortageCards.map((s) => (
+            <article key={s.id} className="contacts-card">
+              <strong>{s.title}</strong>
+              <div className="comms-meta">{s.detail1}</div>
+              <div className="comms-meta">{s.detail2}</div>
+              <div className="comms-meta">{s.detail3}</div>
               <div className="po-inline-actions">
-                <button type="button" className="btn btn--ghost" onClick={() => setTransferModal(s)}>Request Emergency Transfer</button>
-                <button type="button" className="btn btn--green" onClick={() => setPlannerModal(true)}>Contact Planner</button>
+                {s.canActions ? (
+                  <>
+                    <button type="button" className="btn btn--ghost" onClick={() => setTransferModal({ sku: s.sku, workOrder: s.detail1.replace('Work Order: ', ''), shortQty: s.detail2.replace('Quantity short: ', '') })}>Request Emergency Transfer</button>
+                    <button type="button" className="btn btn--green" onClick={() => setPlannerModal(true)}>Contact Planner</button>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn--ghost" onClick={() => setPlannerModal(true)}>Contact Planner</button>
+                )}
               </div>
             </article>
           ))}
@@ -234,6 +441,22 @@ export function ShopFloorModule({ onComposeEmail }) {
               <button type="button" className="btn btn--ghost" onClick={() => window.open(`msteams://l/chat/0/0?users=${planner.teamsHandle}`, '_blank')}>Teams</button>
               <button type="button" className="btn btn--ghost" onClick={() => window.open(`slack://user?team=vectrum&id=${planner.slackHandle}`, '_blank')}>Slack</button>
               <button type="button" className="btn btn--ghost" onClick={() => setPlannerModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {floatModal && (
+        <div className="po-modal-backdrop">
+          <div className="po-modal">
+            <h3>Update Float</h3>
+            <label>Component<input value={floatModal.component.component} readOnly /></label>
+            <label>Line<input value={floatModal.line} readOnly /></label>
+            <label>New count<input type="number" min="0" value={floatNewCount} onChange={(e) => setFloatNewCount(e.target.value)} /></label>
+            <label>Updated by<input value={floatUpdatedBy} onChange={(e) => setFloatUpdatedBy(e.target.value)} /></label>
+            <div className="po-form-actions">
+              <button type="button" className="btn btn--ghost" onClick={() => setFloatModal(null)}>Cancel</button>
+              <button type="button" className="btn btn--green" onClick={submitFloatUpdate}>Submit</button>
             </div>
           </div>
         </div>

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { classBCData } from '../data/sampleData';
 import { getAdjustmentRowsForSku } from '../data/partsMovementHistorySeed';
 import { daysCoverFromWks, isFgLowStockByDaysCover } from '../utils/coverageDisplay';
+import { RIVIT_MC_REPLENISHMENT_QUEUE_KEY } from '../constants/demoStorageKeys';
 
 const FG_LOCATIONS = [
   'Line 1 — Assembly',
@@ -34,6 +35,14 @@ const WRITE_OFF_REASONS = [
   'Obsolete',
   'Lost — investigation required',
   'Cycle count adjustment',
+];
+
+const REPLENISHMENT_SEED = [
+  { id: 'rq-1', minsAgo: 8, line: 'Line 1', station: 'Station 4', sku: 'CMP-RBR-GRM-12', description: 'Rubber Grommet 1/2 inch', inventoryClass: 'C', qtyRequested: 200, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
+  { id: 'rq-2', minsAgo: 12, line: 'Line 1', station: 'Station 4', sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly 13L', inventoryClass: 'A', qtyRequested: 2, urgency: 'URGENT', requestedBy: 'Op. Rodriguez', status: 'PENDING' },
+  { id: 'rq-3', minsAgo: 24, line: 'Line 2', station: 'Station 7', sku: 'CMP-M10-FLN', description: 'M10 Flange Nut', inventoryClass: 'C', qtyRequested: 500, urgency: 'NORMAL', requestedBy: 'Op. Chen', status: 'ACKNOWLEDGED' },
+  { id: 'rq-4', minsAgo: 45, line: 'Line 1', station: 'Station 4', sku: 'CMP-CBL-TIE', description: 'Cable Tie 200mm', inventoryClass: 'C', qtyRequested: 300, urgency: 'NORMAL', requestedBy: 'Op. Rodriguez', status: 'DISPATCHED' },
+  { id: 'rq-5', minsAgo: 60, line: 'Line 3', station: 'Station 2', sku: 'CMP-BRK-CAL', description: 'Brake Caliper Assembly', inventoryClass: 'B', qtyRequested: 4, urgency: 'NORMAL', requestedBy: 'Op. Williams', status: 'DELIVERED' },
 ];
 
 const fieldFull = { width: '100%', maxWidth: '100%', marginTop: 4, display: 'block' };
@@ -156,6 +165,29 @@ function isThisMonth(d) {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth();
 }
 
+function queueAgeLabel(at) {
+  const mins = Math.max(1, Math.floor((Date.now() - new Date(at).getTime()) / 60000));
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.floor(mins / 60);
+  return `${h} hr ago`;
+}
+
+function parseLineStation(stationId) {
+  const raw = String(stationId || '').trim();
+  if (!raw) return { line: 'Line 1', station: 'Station 1' };
+  const parts = raw.split('—').map((x) => x.trim()).filter(Boolean);
+  if (parts.length >= 2) return { line: parts[0], station: parts[1] };
+  return { line: raw, station: 'Station 1' };
+}
+
+function seedQueueRows() {
+  const now = Date.now();
+  return REPLENISHMENT_SEED.map((r) => ({
+    ...r,
+    createdAt: new Date(now - r.minsAgo * 60000).toISOString(),
+  }));
+}
+
 function BlueprintLink({ sku }) {
   const href = `https://drawings.vectrum.com/parts/${encodeURIComponent(sku)}`;
   return (
@@ -165,7 +197,7 @@ function BlueprintLink({ sku }) {
   );
 }
 
-export function PartsInventoryModule() {
+export function PartsInventoryModule({ currentRoleId, onAddNotification }) {
   const {
     skuData,
     setSkuData,
@@ -204,10 +236,83 @@ export function PartsInventoryModule() {
   const [fNotes, setFNotes] = useState('');
   const [fBy, setFBy] = useState('');
   const [fWriteOffVoluntary, setFWriteOffVoluntary] = useState(false);
+  const [queueRows, setQueueRows] = useState([]);
+  const [cannotFulfillRow, setCannotFulfillRow] = useState(null);
+  const [cannotReason, setCannotReason] = useState('Not in system');
+  const [cannotNotes, setCannotNotes] = useState('');
+  const [cannotHotPart, setCannotHotPart] = useState(false);
+  const [cannotNotifySupervisor, setCannotNotifySupervisor] = useState(true);
 
   const showToast = (msg) => {
     setToast({ msg, id: Date.now() });
     window.setTimeout(() => setToast(null), 4000);
+  };
+  const canSeeReplenishmentQueue =
+    currentRoleId === 'material-coordinator' || currentRoleId === 'admin';
+
+  const hydrateQueueFromStorage = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY);
+      if (!raw) {
+        const seeded = seedQueueRows();
+        setQueueRows(seeded);
+        window.localStorage.setItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY, JSON.stringify(seeded));
+        return seeded;
+      }
+      const parsed = JSON.parse(raw);
+      const rows = Array.isArray(parsed) ? parsed : [];
+      const normalized = rows.map((r, idx) => {
+        const status = r.status === 'SUBMITTED' ? 'PENDING' : r.status || r.queueStatus || 'PENDING';
+        const st = parseLineStation(r.stationId || `${r.line || ''} — ${r.station || ''}`);
+        return {
+          id: r.id || `rq-runtime-${idx}`,
+          createdAt: r.createdAt || r.created_at || r.at || new Date().toISOString(),
+          line: r.line || st.line,
+          station: r.station || st.station,
+          sku: r.sku || '',
+          description: r.description || '',
+          inventoryClass: r.inventoryClass || r.class || (/CMP-(ENG|AXL|BAT|WRH|HYD|INV)/i.test(r.sku || '') ? 'A' : 'C'),
+          qtyRequested: Number(r.qtyRequested ?? r.requestedQty ?? r.qty ?? 0) || 0,
+          urgency: r.urgency === 'URGENT' ? 'URGENT' : 'NORMAL',
+          requestedBy: r.requestedBy || 'Operator',
+          status,
+        };
+      });
+      const seededById = new Map(seedQueueRows().map((x) => [x.id, x]));
+      normalized.forEach((r) => seededById.set(r.id, r));
+      const merged = Array.from(seededById.values()).sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      setQueueRows(merged);
+      window.localStorage.setItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY, JSON.stringify(merged));
+      return merged;
+    } catch {
+      const seeded = seedQueueRows();
+      setQueueRows(seeded);
+      return seeded;
+    }
+  }, []);
+
+  useEffect(() => {
+    hydrateQueueFromStorage();
+    const onStorage = (e) => {
+      if (e.key === RIVIT_MC_REPLENISHMENT_QUEUE_KEY) hydrateQueueFromStorage();
+    };
+    window.addEventListener('storage', onStorage);
+    const t = window.setInterval(() => hydrateQueueFromStorage(), 10000);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.clearInterval(t);
+    };
+  }, [hydrateQueueFromStorage]);
+
+  const persistQueueRows = (nextRows) => {
+    setQueueRows(nextRows);
+    try {
+      window.localStorage.setItem(RIVIT_MC_REPLENISHMENT_QUEUE_KEY, JSON.stringify(nextRows));
+    } catch {
+      /* ignore */
+    }
   };
 
   const totalCatalogCount = useMemo(
@@ -594,8 +699,132 @@ export function PartsInventoryModule() {
     }
   }, [tfFrom, locList, tfTo]);
 
+  const updateQueueStatus = (id, status) => {
+    const next = queueRows.map((r) => (r.id === id ? { ...r, status } : r));
+    persistQueueRows(next);
+  };
+
+  const openCannotFulfill = (row) => {
+    setCannotFulfillRow(row);
+    setCannotReason('Not in system');
+    setCannotNotes('');
+    setCannotHotPart(row.inventoryClass === 'A');
+    setCannotNotifySupervisor(true);
+  };
+
+  const submitCannotFulfill = () => {
+    if (!cannotFulfillRow) return;
+    const next = queueRows.map((r) =>
+      r.id === cannotFulfillRow.id ? { ...r, status: 'PENDING', cannotFulfill: true } : r
+    );
+    persistQueueRows(next);
+    setCannotFulfillRow(null);
+    showToast('Cannot fulfill logged — Line Supervisor and Buyer notified');
+    if (onAddNotification) {
+      onAddNotification({
+        severity: 'CRITICAL',
+        title: `Cannot fulfill ${cannotFulfillRow.sku}`,
+        body: `Line ${cannotFulfillRow.line} ${cannotFulfillRow.station}: ${cannotReason}${
+          cannotNotes ? ` — ${cannotNotes}` : ''
+        }`,
+        moduleLabel: 'Parts Inventory',
+        moduleId: 'inventory-parts',
+        category: 'inventory',
+        timeAgo: 'just now',
+      });
+    }
+  };
+
   return (
     <div className="parts-inv module-grid">
+      {canSeeReplenishmentQueue && (
+        <section className="panel panel--span3" style={{ padding: '0.9rem' }}>
+          <div className="panel__head">
+            <h2>Replenishment Queue</h2>
+            <span className="panel__meta">Incoming requests from production lines — action required</span>
+          </div>
+          <div className="table-scroll" style={{ maxHeight: 320 }}>
+            <table className="data-table" style={{ fontSize: 11.5 }}>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Line</th>
+                  <th>Station</th>
+                  <th>Part SKU</th>
+                  <th>Description</th>
+                  <th>Class</th>
+                  <th className="num">Qty Requested</th>
+                  <th>Urgency</th>
+                  <th>Requested By</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queueRows.map((r) => (
+                  <tr key={r.id} style={r.inventoryClass === 'A' ? { borderLeft: '3px solid rgba(248,113,113,0.45)' } : undefined}>
+                    <td>{queueAgeLabel(r.createdAt)}</td>
+                    <td>{r.line}</td>
+                    <td>{r.station}</td>
+                    <td className="mono">{r.sku}</td>
+                    <td>{r.description}</td>
+                    <td><span className={`parts-inv__abc parts-inv__abc--${String(r.inventoryClass || 'C').toLowerCase()}`}>Class {r.inventoryClass}</span></td>
+                    <td className="num">{r.qtyRequested.toLocaleString()}</td>
+                    <td>
+                      <span className={r.urgency === 'URGENT' ? 'pill pill--critical' : 'pill pill--route'}>{r.urgency}</span>
+                    </td>
+                    <td>{r.requestedBy}</td>
+                    <td>
+                      <span
+                        className={
+                          r.status === 'DELIVERED'
+                            ? 'pill pill--healthy'
+                            : r.status === 'ACKNOWLEDGED'
+                              ? 'pill pill--route'
+                              : 'pill'
+                        }
+                        style={
+                          r.status === 'PENDING'
+                            ? { borderColor: 'rgba(251,146,60,0.52)', color: '#fdba74', background: 'rgba(154,52,18,0.25)' }
+                            : r.status === 'DISPATCHED'
+                              ? { borderColor: 'rgba(250,204,21,0.45)', color: '#fde68a', background: 'rgba(120,53,15,0.28)' }
+                              : undefined
+                        }
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="po-inline-actions">
+                        {r.status === 'PENDING' && (
+                          <>
+                            <button type="button" className="btn btn--green" style={{ background: 'rgba(8,145,178,0.22)', borderColor: 'rgba(34,211,238,0.5)', color: '#67e8f9' }} onClick={() => updateQueueStatus(r.id, 'ACKNOWLEDGED')}>Acknowledge</button>
+                            <button type="button" className="btn btn--danger" onClick={() => openCannotFulfill(r)}>Cannot Fulfill</button>
+                          </>
+                        )}
+                        {r.status === 'ACKNOWLEDGED' && (
+                          <>
+                            <button type="button" className="btn" style={{ background: 'rgba(250,204,21,0.2)', borderColor: 'rgba(250,204,21,0.5)', color: '#fde68a' }} onClick={() => updateQueueStatus(r.id, 'DISPATCHED')}>Dispatch Material Handler</button>
+                            <button type="button" className="btn btn--danger" onClick={() => openCannotFulfill(r)}>Cannot Fulfill</button>
+                          </>
+                        )}
+                        {r.status === 'DISPATCHED' && (
+                          <>
+                            <button type="button" className="btn btn--green" onClick={() => updateQueueStatus(r.id, 'DELIVERED')}>Mark Delivered</button>
+                            <button type="button" className="btn" style={{ background: 'rgba(251,146,60,0.2)', borderColor: 'rgba(251,146,60,0.5)', color: '#fdba74' }} onClick={() => openCannotFulfill(r)}>Part Not Found</button>
+                          </>
+                        )}
+                        {r.status === 'DELIVERED' && <span className="panel__meta">—</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className="panel panel--span3 parts-inv__kpi-wrap">
         <div className="parts-inv__kpi-bar">
           <div className="inv-kpi parts-inv__kpi" style={{ borderLeftColor: '#3b82f6' }}>
@@ -887,6 +1116,38 @@ export function PartsInventoryModule() {
             )}
             <button type="button" className="modal-card__action" onClick={applyWriteOff} style={{ marginTop: 10, borderColor: 'rgba(248, 113, 113, 0.45)' }}>Submit</button>
             <button type="button" className="modal-card__action" onClick={() => setWriteOffOpen(false)} style={{ marginTop: 6 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {cannotFulfillRow && (
+        <div className="modal-backdrop" onClick={() => setCannotFulfillRow(null)} role="presentation" style={{ zIndex: 1500 }}>
+          <div className="modal-card" style={{ maxWidth: 460, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <h3>Cannot Fulfill</h3>
+            <p className="panel__meta">Part SKU: <span className="mono" style={{ fontWeight: 700 }}>{cannotFulfillRow.sku}</span></p>
+            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+              Reason
+              <select value={cannotReason} onChange={(e) => setCannotReason(e.target.value)} style={selectBase}>
+                <option value="Not in system">Not in system</option>
+                <option value="Cannot locate physically">Cannot locate physically</option>
+                <option value="Quantity discrepancy">Quantity discrepancy</option>
+                <option value="Part damaged">Part damaged</option>
+              </select>
+            </label>
+            <label className="panel__meta" style={{ display: 'block', marginTop: 6 }}>
+              Notes
+              <input value={cannotNotes} onChange={(e) => setCannotNotes(e.target.value)} className="globe-search" style={fieldFull} />
+            </label>
+            <label className="panel__meta" style={{ display: 'block', marginTop: 8 }}>
+              <input type="checkbox" checked={cannotHotPart} onChange={() => setCannotHotPart((v) => !v)} />
+              {' '}Auto-escalate to Hot Part Request
+            </label>
+            <label className="panel__meta" style={{ display: 'block', marginTop: 4 }}>
+              <input type="checkbox" checked={cannotNotifySupervisor} onChange={() => setCannotNotifySupervisor((v) => !v)} />
+              {' '}Notify Line Supervisor
+            </label>
+            <button type="button" className="modal-card__action" onClick={submitCannotFulfill} style={{ marginTop: 10 }}>Submit</button>
+            <button type="button" className="modal-card__action" onClick={() => setCannotFulfillRow(null)} style={{ marginTop: 6 }}>Cancel</button>
           </div>
         </div>
       )}

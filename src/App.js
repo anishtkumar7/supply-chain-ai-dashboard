@@ -19,6 +19,7 @@ import { PurchaseOrdersModule } from './modules/PurchaseOrdersModule';
 import { ContactsModule } from './modules/ContactsModule';
 import { ReceivingModule } from './modules/ReceivingModule';
 import { ShopFloorModule } from './modules/ShopFloorModule';
+import { MyWorkStationModule } from './modules/MyWorkStationModule';
 import { AttentionQueueModule } from './modules/AttentionQueueModule';
 import { AgenticPlaybookModule } from './modules/AgenticPlaybookModule';
 import { useDashboardData } from './context/DashboardDataContext';
@@ -39,6 +40,7 @@ import {
   CONTACTS_ID,
   RECEIVING_ID,
   SHOP_FLOOR_ID,
+  MY_WORK_STATION_ID,
   ATTENTION_QUEUE_ID,
   AGENTIC_PLAYBOOK_ID,
 } from './config/roleNavConfig';
@@ -297,6 +299,18 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     [allowedCats, notifications]
   );
   const unreadCount = visibleNotifications.filter((n) => !n.read).length;
+
+  const pushNotification = useCallback((entry) => {
+    setNotifications((rows) => [
+      {
+        id: `n-${Date.now()}`,
+        read: false,
+        timeAgo: 'just now',
+        ...entry,
+      },
+      ...rows,
+    ]);
+  }, []);
 
   useEffect(() => {
     if (invIdSet.has(active)) {
@@ -637,13 +651,21 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     if (active === PURCHASE_ORDERS_ID) return () => <PurchaseOrdersModule onComposeEmail={openCompose} />;
     if (active === RECEIVING_ID) return () => <ReceivingModule loggedInName={displayName} onComposeEmail={openCompose} />;
     if (active === SHOP_FLOOR_ID) return () => <ShopFloorModule onComposeEmail={openCompose} />;
+    if (active === MY_WORK_STATION_ID) return () => <MyWorkStationModule />;
     if (active === CONTACTS_ID) return () => <ContactsModule onComposeEmail={openCompose} />;
     if (active === inventoryNavIds.fg) return () => <InventoryModule variant="fg" currentRoleId={roleId} currentUserName={displayName} />;
     if (active === inventoryNavIds.components) return () => <InventoryModule variant="components" currentRoleId={roleId} currentUserName={displayName} />;
-    if (active === inventoryNavIds.parts) return () => <PartsInventoryModule />;
+    if (active === inventoryNavIds.parts) {
+      return () => (
+        <PartsInventoryModule
+          currentRoleId={roleId}
+          onAddNotification={pushNotification}
+        />
+      );
+    }
     const Comp = views[active];
     return Comp ? () => <Comp /> : () => <InventoryModule variant="fg" />;
-  }, [active, navigateFromAttention, openCompose, displayName, roleId]);
+  }, [active, navigateFromAttention, openCompose, displayName, roleId, pushNotification]);
 
   const renderNavItem = useCallback(
     (id, key) => {
@@ -680,7 +702,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
   const showProductionSection = [PRODUCTION_PLANNING_ID, SHOP_FLOOR_ID].some((id) => access.allowedIds.has(id));
   const showProcurementSection = ['suppliers', 'trade-risk'].some((id) => access.allowedIds.has(id)) || showPlanningGroup;
   const showDemandSection = access.allowedIds.has('demand');
-  const showToolsSection = ['agents', CONTACTS_ID, 'data-sync'].some((id) => access.allowedIds.has(id));
+  const showToolsSection = [MY_WORK_STATION_ID, 'agents', CONTACTS_ID, 'data-sync'].some((id) => access.allowedIds.has(id));
 
   useEffect(() => {
     if (!access.allowedIds.has(active)) {
@@ -909,6 +931,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
           {showDemandSection && renderNavItem('demand')}
 
           {showToolsSection && !sidebarCollapsed && <div className="nav-section-label">Tools</div>}
+          {showToolsSection && access.allowedIds.has(MY_WORK_STATION_ID) && renderNavItem(MY_WORK_STATION_ID)}
           {showToolsSection && access.allowedIds.has('agents') && renderNavItem('agents')}
           {showToolsSection && access.allowedIds.has(CONTACTS_ID) && renderNavItem(CONTACTS_ID)}
           {showToolsSection && access.allowedIds.has('data-sync') && renderNavItem('data-sync')}
