@@ -225,7 +225,7 @@ export const ROLE_CARDS = [
     id: 'mfg-engineer',
     icon: '⚙️',
     title: 'Manufacturing Engineer',
-    description: 'Production planning, work orders, BOM',
+    description: 'Production planning, production sequences, BOM',
   },
   {
     id: 'warehouse',
@@ -243,13 +243,13 @@ export const ROLE_CARDS = [
     id: 'shop-supervisor',
     icon: '🔧',
     title: 'Shop Floor Supervisor',
-    description: 'Line status, work orders, shortage flags',
+    description: 'Line status, production sequences, shortage flags',
   },
   {
     id: 'operator',
     icon: '🧰',
     title: 'Operator',
-    description: 'Line replenishment requests, work order status, shortage flags',
+    description: 'Line replenishment requests, production sequence status, shortage flags',
   },
 ];
 

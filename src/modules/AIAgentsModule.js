@@ -137,11 +137,11 @@ export function AIAgentsModule({ onComposeEmail }) {
     const byOverdueComp = overdueComponents[0];
 
     const crisisOrderBankAlert =
-      'FG-T800-CL Class 8 Highway Tractor — 3 work orders at risk of missing promise date due to CMP-WHL-DRV shortage. WO-4421, WO-4424, WO-4428 all require drive axle wheel assemblies within next 4 days.';
+      'FG-T800-CL Class 8 Highway Tractor — 3 production sequences at risk of missing promise date due to CMP-WHL-DRV shortage. SEQ-4421, SEQ-4424, SEQ-4428 all require drive axle wheel assemblies within next 4 days.';
     const crisisInventoryAlert =
       'CMP-WHL-DRV Drive Axle Wheel Assembly at 4 days supply. 14 units on hand. Current build rate requires 3-4 units per day sequenced to Line 1. No inbound shipment confirmed. Reorder overdue 8 days.';
     const crisisSupplyPlanningAlert =
-      'CMP-WHL-DRV Drive Axle Wheel and Tire Assembly 11R22.5 at 4 days supply. Reorder date was 2026-04-28 — 8 days overdue. No PO acknowledged from Detroit Wheel Systems. These are sequenced to work orders — no float buffer exists. Line 1 complete stoppage risk within 4 days. Recommend immediate supplier escalation and air freight evaluation.';
+      'CMP-WHL-DRV Drive Axle Wheel and Tire Assembly 11R22.5 at 4 days supply. Reorder date was 2026-04-28 — 8 days overdue. No PO acknowledged from Detroit Wheel Systems. These are sequenced to production sequences — no float buffer exists. Line 1 complete stoppage risk within 4 days. Recommend immediate supplier escalation and air freight evaluation.';
 
     const cleanOrderBankAlert = riskyOrders.length
       ? `${byRiskyOrder.sku}: ${riskyOrders.length} orders at risk of missing promise date. Expedite recommended.`

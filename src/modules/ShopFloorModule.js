@@ -9,32 +9,32 @@ const LINES = [
   { id: 'line4', title: 'Line 4 — EV Assembly', status: 'STOPPED', build: 'FG-E300-EV Electric Powertrain Unit', planned: 4, complete: 1, shift: 'Day Shift — STOPPAGE at 10:42 AM' },
 ];
 
-const WORK_ORDERS = [
+const PRODUCTION_SEQUENCES = [
   {
-    id: 'WO-4421', line: 'Line 1', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', planned: 12, complete: 7, progress: 58, parts: 'All Parts Available', partsState: 'ok', start: '6:00 AM', status: 'IN PROGRESS',
+    id: 'SEQ-4421', line: 'Line 1', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', planned: 12, complete: 7, progress: 58, parts: 'All Parts Available', partsState: 'ok', start: '6:00 AM', status: 'IN PROGRESS',
     bom: [{ sku: 'CMP-ENG-001', required: 12, available: 412, status: 'AVAILABLE' }, { sku: 'CMP-WRH-004', required: 12, available: 900, status: 'AVAILABLE' }],
   },
   {
-    id: 'WO-4422', line: 'Line 2', product: 'Heavy Duty Vocational', sku: 'FG-V900-HD', planned: 8, complete: 3, progress: 37, parts: 'All Parts Available', partsState: 'ok', start: '6:00 AM', status: 'IN PROGRESS',
+    id: 'SEQ-4422', line: 'Line 2', product: 'Heavy Duty Vocational', sku: 'FG-V900-HD', planned: 8, complete: 3, progress: 37, parts: 'All Parts Available', partsState: 'ok', start: '6:00 AM', status: 'IN PROGRESS',
     bom: [{ sku: 'CMP-AXL-002', required: 8, available: 1100, status: 'AVAILABLE' }, { sku: 'CMP-HYD-008', required: 8, available: 2200, status: 'AVAILABLE' }],
   },
   {
-    id: 'WO-4423', line: 'Line 4', product: 'Electric Powertrain Unit', sku: 'FG-E300-EV', planned: 4, complete: 1, progress: 25, parts: 'Parts Shortage — CMP-BAT-009', partsState: 'critical', start: '6:00 AM', status: 'STOPPED',
+    id: 'SEQ-4423', line: 'Line 4', product: 'Electric Powertrain Unit', sku: 'FG-E300-EV', planned: 4, complete: 1, progress: 25, parts: 'Parts Shortage — CMP-BAT-009', partsState: 'critical', start: '6:00 AM', status: 'STOPPED',
     bom: [{ sku: 'CMP-BAT-009', required: 400, available: 280, status: 'CRITICAL' }, { sku: 'CMP-INV-006', required: 400, available: 620, status: 'AVAILABLE' }],
   },
   {
-    id: 'WO-4424', line: 'Line 1', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', planned: 6, complete: 0, progress: 0, parts: 'Parts Shortage — CMP-WHL-DRV', partsState: 'critical', start: '2:00 PM', status: 'PENDING — SHORTAGE',
+    id: 'SEQ-4424', line: 'Line 1', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', planned: 6, complete: 0, progress: 0, parts: 'Parts Shortage — CMP-WHL-DRV', partsState: 'critical', start: '2:00 PM', status: 'PENDING — SHORTAGE',
     bom: [{ sku: 'CMP-WHL-DRV', required: 8, available: 14, status: 'CRITICAL' }, { sku: 'CMP-AXL-002', required: 6, available: 1100, status: 'AVAILABLE' }],
   },
   {
-    id: 'WO-4425', line: 'Line 3', product: 'Medium Duty Platform', sku: 'FG-M550-MD', planned: 5, complete: 0, progress: 0, parts: 'Checking inventory', partsState: 'warn', start: '2:00 PM', status: 'SCHEDULED',
+    id: 'SEQ-4425', line: 'Line 3', product: 'Medium Duty Platform', sku: 'FG-M550-MD', planned: 5, complete: 0, progress: 0, parts: 'Checking inventory', partsState: 'warn', start: '2:00 PM', status: 'SCHEDULED',
     bom: [{ sku: 'CMP-TCM-003', required: 5, available: 8400, status: 'AVAILABLE' }, { sku: 'CMP-CAB-010', required: 5, available: 3200, status: 'SHORT' }],
   },
 ];
 
 const SHORTAGES = [
-  { sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel Assembly', workOrder: 'WO-4424', shortQty: 8, daysToStop: 0 },
-  { sku: 'CMP-BAT-009', description: 'EV Battery Pack', workOrder: 'WO-4423', shortQty: 120, daysToStop: 0 },
+  { sku: 'CMP-WHL-DRV', description: 'Drive Axle Wheel Assembly', productionSequence: 'SEQ-4424', shortQty: 8, daysToStop: 0 },
+  { sku: 'CMP-BAT-009', description: 'EV Battery Pack', productionSequence: 'SEQ-4423', shortQty: 120, daysToStop: 0 },
 ];
 
 const FLOAT_STATUS_SEED = [
@@ -125,9 +125,9 @@ function cloneDeep(v) {
 export function ShopFloorModule({ onComposeEmail }) {
   const { contactDirectory, addAdjustmentHistory, demoScenario } = useDashboardData();
 
-  const workOrders = useMemo(() => {
-    if (demoScenario !== 'clean') return WORK_ORDERS;
-    return WORK_ORDERS.map((w) => (w.id === 'WO-4424' ? { ...SHOP_WO_4424_CLEAN } : w));
+  const productionSequences = useMemo(() => {
+    if (demoScenario !== 'clean') return PRODUCTION_SEQUENCES;
+    return PRODUCTION_SEQUENCES.map((w) => (w.id === 'SEQ-4424' ? { ...SHOP_WO_4424_CLEAN } : w));
   }, [demoScenario]);
 
   const shortagesForScenario = useMemo(
@@ -188,7 +188,7 @@ export function ShopFloorModule({ onComposeEmail }) {
       ...shortagesForScenario.map((s) => ({
         id: s.sku,
         title: `${s.sku} ${s.description}`,
-        detail1: `Work Order: ${s.workOrder}`,
+        detail1: `Production Sequence: ${s.productionSequence}`,
         detail2: `Quantity short: ${s.shortQty}`,
         detail3:
           s.sku === 'CMP-WHL-DRV'
@@ -338,10 +338,10 @@ export function ShopFloorModule({ onComposeEmail }) {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>Work Order</th><th>Line</th><th>Product</th><th>SKU</th><th>Planned Qty</th><th>Completed Qty</th><th>Progress</th><th>Parts Status</th><th>Start Time</th><th>Status</th></tr>
+              <tr><th>Production Sequence</th><th>Line</th><th>Product</th><th>SKU</th><th>Planned Qty</th><th>Completed Qty</th><th>Progress</th><th>Parts Status</th><th>Start Time</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {workOrders.map((w) => (
+              {productionSequences.map((w) => (
                 <Fragment key={w.id}>
                   <tr key={w.id} onClick={() => setExpandedWo((id) => (id === w.id ? null : w.id))} className={w.partsState === 'critical' ? 'data-table__row--shortage' : undefined} style={{ cursor: 'pointer' }}>
                     <td>{w.id}</td><td>{w.line}</td><td>{w.product}</td><td>{w.sku}</td><td>{w.planned}</td><td>{w.complete}</td>
@@ -385,7 +385,7 @@ export function ShopFloorModule({ onComposeEmail }) {
               <div className="po-inline-actions">
                 {s.canActions ? (
                   <>
-                    <button type="button" className="btn btn--ghost" onClick={() => setTransferModal({ sku: s.sku, workOrder: s.detail1.replace('Work Order: ', ''), shortQty: s.detail2.replace('Quantity short: ', '') })}>Request Emergency Transfer</button>
+                    <button type="button" className="btn btn--ghost" onClick={() => setTransferModal({ sku: s.sku, productionSequence: s.detail1.replace('Production Sequence: ', ''), shortQty: s.detail2.replace('Quantity short: ', '') })}>Request Emergency Transfer</button>
                     <button type="button" className="btn btn--green" onClick={() => setEscalationContactModal(buyer || planner)}>
                       Contact Buyer
                     </button>
@@ -441,7 +441,7 @@ export function ShopFloorModule({ onComposeEmail }) {
         <div className="po-modal-backdrop">
           <div className="po-modal">
             <h3>Emergency Transfer Request</h3>
-            <p className="panel__lede mono">{transferModal.sku} · {transferModal.workOrder} · short {transferModal.shortQty}</p>
+            <p className="panel__lede mono">{transferModal.sku} · {transferModal.productionSequence} · short {transferModal.shortQty}</p>
             <p className="panel__lede">Transfer request draft created for Parts Inventory team.</p>
             <div className="po-form-actions">
               <button type="button" className="btn btn--ghost" onClick={() => setTransferModal(null)}>Close</button>
@@ -466,8 +466,8 @@ export function ShopFloorModule({ onComposeEmail }) {
                     subject: 'Shop floor shortage escalation',
                     body:
                       demoScenario === 'clean'
-                        ? 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WRH-004 (WO-4424)\n- CMP-BAT-009 (WO-4423)\n\nPlease advise.\n\nThanks,\nShop Floor'
-                        : 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WHL-DRV (WO-4424)\n- CMP-BAT-009 (WO-4423)\n\nPlease advise.\n\nThanks,\nShop Floor',
+                        ? 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WRH-004 (SEQ-4424)\n- CMP-BAT-009 (SEQ-4423)\n\nPlease advise.\n\nThanks,\nShop Floor'
+                        : 'Hi team,\n\nShop floor has active shortages requiring immediate support:\n- CMP-WHL-DRV (SEQ-4424)\n- CMP-BAT-009 (SEQ-4423)\n\nPlease advise.\n\nThanks,\nShop Floor',
                   })
                 }
               >

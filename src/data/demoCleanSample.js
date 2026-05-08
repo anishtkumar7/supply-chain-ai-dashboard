@@ -160,12 +160,12 @@ export const SHOP_FLOAT_STATUS_CLEAN = [
 ];
 
 export const SHOP_SHORTAGES_CLEAN = [
-  { sku: 'CMP-BAT-009', description: 'EV Battery Pack', workOrder: 'WO-4423', shortQty: 120, daysToStop: 0 },
-  { sku: 'CMP-WRH-004', description: 'Wiring Harness', workOrder: 'WO-4424', shortQty: 6200, daysToStop: 0 },
+  { sku: 'CMP-BAT-009', description: 'EV Battery Pack', productionSequence: 'SEQ-4423', shortQty: 120, daysToStop: 0 },
+  { sku: 'CMP-WRH-004', description: 'Wiring Harness', productionSequence: 'SEQ-4424', shortQty: 6200, daysToStop: 0 },
 ];
 
 export const SHOP_WO_4424_CLEAN = {
-  id: 'WO-4424',
+  id: 'SEQ-4424',
   line: 'Line 1',
   product: 'Regional Cab-Over Truck',
   sku: 'FG-R450-CO',

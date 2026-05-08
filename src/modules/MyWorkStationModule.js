@@ -9,7 +9,7 @@ import { useDashboardData } from '../context/DashboardDataContext';
 const STATION_ID = 'Line 1 — Station 4';
 
 const SHIFT_KPIS = [
-  { label: 'Current Work Order', value: 'WO-4421' },
+  { label: 'Current Production Sequence', value: 'SEQ-4421' },
   { label: 'Building', value: 'Class 8 Highway Tractor FG-T800-CL' },
   { label: 'Line', value: 'Line 1 — Assembly' },
   { label: 'Shift', value: 'Day Shift — ends 3:00 PM' },
@@ -37,7 +37,7 @@ const INITIAL_REQUESTS = [
     stationId: STATION_ID,
     estDelivery: 'Pending MC acknowledgment',
     urgency: 'URGENT',
-    notes: 'Only 2 remaining at station, need 4 minimum for next 2 work orders',
+    notes: 'Only 2 remaining at station, need 4 minimum for next 2 production sequences',
   },
   {
     id: 'REQ-CBL-1',

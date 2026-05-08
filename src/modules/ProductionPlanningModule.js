@@ -1,31 +1,31 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useDashboardData } from '../context/DashboardDataContext';
 
-const WEEKLY_WORK_ORDERS = [
-  { id: 'WO-4421', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', line: 'Line 1', start: 'Mon Apr 28', end: 'Mon Apr 28', plannedQty: 12, status: 'IN PROGRESS' },
-  { id: 'WO-4422', product: 'Heavy Duty Vocational', sku: 'FG-V900-HD', line: 'Line 2', start: 'Mon Apr 28', end: 'Tue Apr 29', plannedQty: 8, status: 'IN PROGRESS' },
-  { id: 'WO-4423', product: 'Electric Powertrain Unit', sku: 'FG-E300-EV', line: 'Line 4', start: 'Mon Apr 28', end: 'Mon Apr 28', plannedQty: 4, status: 'STOPPED' },
-  { id: 'WO-4424', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', line: 'Line 1', start: 'Mon Apr 28', end: 'Tue Apr 29', plannedQty: 6, status: 'PENDING SHORTAGE' },
-  { id: 'WO-4425', product: 'Medium Duty Platform', sku: 'FG-M550-MD', line: 'Line 3', start: 'Tue Apr 29', end: 'Tue Apr 29', plannedQty: 5, status: 'SCHEDULED' },
-  { id: 'WO-4426', product: 'Specialty Work Vehicle', sku: 'FG-S200-SV', line: 'Line 2', start: 'Wed Apr 30', end: 'Wed Apr 30', plannedQty: 10, status: 'SCHEDULED' },
-  { id: 'WO-4427', product: 'Cab Assembly Unit', sku: 'FG-C100-CA', line: 'Line 1', start: 'Thu May 1', end: 'Thu May 1', plannedQty: 4, status: 'SCHEDULED' },
-  { id: 'WO-4428', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', line: 'Line 1', start: 'Fri May 2', end: 'Fri May 2', plannedQty: 14, status: 'SCHEDULED' },
+const WEEKLY_PRODUCTION_SEQUENCES = [
+  { id: 'SEQ-4421', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', line: 'Line 1', start: 'Mon Apr 28', end: 'Mon Apr 28', plannedQty: 12, status: 'IN PROGRESS' },
+  { id: 'SEQ-4422', product: 'Heavy Duty Vocational', sku: 'FG-V900-HD', line: 'Line 2', start: 'Mon Apr 28', end: 'Tue Apr 29', plannedQty: 8, status: 'IN PROGRESS' },
+  { id: 'SEQ-4423', product: 'Electric Powertrain Unit', sku: 'FG-E300-EV', line: 'Line 4', start: 'Mon Apr 28', end: 'Mon Apr 28', plannedQty: 4, status: 'STOPPED' },
+  { id: 'SEQ-4424', product: 'Regional Cab-Over Truck', sku: 'FG-R450-CO', line: 'Line 1', start: 'Mon Apr 28', end: 'Tue Apr 29', plannedQty: 6, status: 'PENDING SHORTAGE' },
+  { id: 'SEQ-4425', product: 'Medium Duty Platform', sku: 'FG-M550-MD', line: 'Line 3', start: 'Tue Apr 29', end: 'Tue Apr 29', plannedQty: 5, status: 'SCHEDULED' },
+  { id: 'SEQ-4426', product: 'Specialty Work Vehicle', sku: 'FG-S200-SV', line: 'Line 2', start: 'Wed Apr 30', end: 'Wed Apr 30', plannedQty: 10, status: 'SCHEDULED' },
+  { id: 'SEQ-4427', product: 'Cab Assembly Unit', sku: 'FG-C100-CA', line: 'Line 1', start: 'Thu May 1', end: 'Thu May 1', plannedQty: 4, status: 'SCHEDULED' },
+  { id: 'SEQ-4428', product: 'Class 8 Highway Tractor', sku: 'FG-T800-CL', line: 'Line 1', start: 'Fri May 2', end: 'Fri May 2', plannedQty: 14, status: 'SCHEDULED' },
 ];
 
-const WORK_ORDER_BOM = {
-  'WO-4421': [
+const PRODUCTION_SEQUENCE_BOM = {
+  'SEQ-4421': [
     { sku: 'CMP-ENG-001', description: 'Diesel Engine Assembly', required: 12, available: 412, status: 'AVAILABLE' },
     { sku: 'CMP-WRH-004', description: 'Wiring Harness', required: 12, available: 900, status: 'AVAILABLE' },
   ],
-  'WO-4422': [
+  'SEQ-4422': [
     { sku: 'CMP-AXL-002', description: 'Front Axle Assembly', required: 8, available: 1100, status: 'AVAILABLE' },
     { sku: 'CMP-HYD-008', description: 'Hydraulic Pump Module', required: 8, available: 2200, status: 'AVAILABLE' },
   ],
-  'WO-4423': [
+  'SEQ-4423': [
     { sku: 'CMP-BAT-009', description: 'EV Battery Pack', required: 400, available: 280, status: 'CRITICAL' },
     { sku: 'CMP-INV-006', description: 'Power Inverter', required: 400, available: 620, status: 'AVAILABLE' },
   ],
-  'WO-4424': [
+  'SEQ-4424': [
     { sku: 'CMP-WRH-004', description: 'Wiring Harness', required: 6200, available: 900, status: 'CRITICAL' },
     { sku: 'CMP-AXL-002', description: 'Front Axle Assembly', required: 6, available: 1100, status: 'AVAILABLE' },
   ],
@@ -39,8 +39,8 @@ const CAPACITY_ROWS = [
 ];
 
 const ENGINEERING_ALERTS = [
-  'WO-4423 STOPPED: EV Battery Pack shortage. 120 units short. Line 4 idle. Contact: Rachel Torres',
-  'WO-4424 AT RISK: Wiring Harness critically low. 6200 units short. Will impact Line 1 by May 1',
+  'SEQ-4423 STOPPED: EV Battery Pack shortage. 120 units short. Line 4 idle. Contact: Rachel Torres',
+  'SEQ-4424 AT RISK: Wiring Harness critically low. 6200 units short. Will impact Line 1 by May 1',
   'BOM Change Notice: FG-T800-CL Bill of Materials updated April 25. Review required before next build run',
 ];
 
@@ -71,7 +71,7 @@ export function ProductionPlanningModule({ onComposeEmail }) {
     <div className="module-grid">
       <section className="panel panel--span3">
         <div className="po-kpi-grid">
-          <article className="po-kpi"><span>Work Orders This Week</span><strong>18</strong></article>
+          <article className="po-kpi"><span>Production Sequences This Week</span><strong>18</strong></article>
           <article className="po-kpi"><span>On Time Completion Rate</span><strong>87.3%</strong></article>
           <article className="po-kpi"><span>Lines Running</span><strong>2 of 4</strong></article>
           <article className="po-kpi"><span>Units Produced Today</span><strong>11 of 29 planned</strong></article>
@@ -82,15 +82,18 @@ export function ProductionPlanningModule({ onComposeEmail }) {
         <div className="panel__head">
           <h2>Weekly Build Plan — Week of April 28 2026</h2>
         </div>
+        <p className="panel__meta" style={{ marginBottom: 10 }}>
+          Production sequences track each unit through the line. Manufacturing Engineering work orders are reserved for repairs and test troubleshooting.
+        </p>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Work Order</th><th>Product</th><th>SKU</th><th>Line</th><th>Planned Start</th><th>Planned End</th><th>Planned Qty</th><th>Status</th>
+                <th>Production Sequence</th><th>Product</th><th>SKU</th><th>Line</th><th>Planned Start</th><th>Planned End</th><th>Planned Qty</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {WEEKLY_WORK_ORDERS.map((wo) => (
+              {WEEKLY_PRODUCTION_SEQUENCES.map((wo) => (
                 <Fragment key={wo.id}>
                   <tr key={wo.id} onClick={() => setExpandedWo((id) => (id === wo.id ? null : wo.id))} style={{ cursor: 'pointer' }}>
                     <td>{wo.id}</td><td>{wo.product}</td><td>{wo.sku}</td><td>{wo.line}</td><td>{wo.start}</td><td>{wo.end}</td><td>{wo.plannedQty}</td>
@@ -104,7 +107,7 @@ export function ProductionPlanningModule({ onComposeEmail }) {
                             <tr><th>Component SKU</th><th>Description</th><th>Required Qty</th><th>Available Qty</th><th>Status</th></tr>
                           </thead>
                           <tbody>
-                            {(WORK_ORDER_BOM[wo.id] || []).map((row) => (
+                            {(PRODUCTION_SEQUENCE_BOM[wo.id] || []).map((row) => (
                               <tr key={`${wo.id}-${row.sku}`}>
                                 <td>{row.sku}</td>
                                 <td>{row.description}</td>
@@ -113,8 +116,8 @@ export function ProductionPlanningModule({ onComposeEmail }) {
                                 <td><span className={bomStatusClass(row.status)}>{row.status}</span></td>
                               </tr>
                             ))}
-                            {!WORK_ORDER_BOM[wo.id]?.length && (
-                              <tr><td colSpan={5} className="po-empty">BOM check not published yet for this work order.</td></tr>
+                            {!PRODUCTION_SEQUENCE_BOM[wo.id]?.length && (
+                              <tr><td colSpan={5} className="po-empty">BOM check not published yet for this production sequence.</td></tr>
                             )}
                           </tbody>
                         </table>

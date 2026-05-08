@@ -318,9 +318,9 @@ function cannedDemoNotifications(demoScenario) {
     {
       id: 'n3',
       severity: 'HIGH',
-      title: 'WO-4424 at Risk — Missing Drive Axle Wheels',
+      title: 'SEQ-4424 at Risk — Missing Drive Axle Wheels',
       body: appendEscalationHint(
-        'Work order for Regional Cab-Over Truck pending shortage. Drive axle wheel assembly required by 2:00 PM today. Only 2 units at station.',
+        'Production sequence for Regional Cab-Over Truck pending shortage. Drive axle wheel assembly required by 2:00 PM today. Only 2 units at station.',
         { module: 'Inventory Monitoring', agent: 'Inventory Agent', alert: 'parts shortage workstation' }
       ),
       moduleLabel: 'Shop Floor',

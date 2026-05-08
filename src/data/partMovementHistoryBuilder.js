@@ -204,7 +204,7 @@ function buildCmpDockStoryCompact(row, tier, h) {
   return events;
 }
 
-/** Sequenced Class A components: receipts in 12-24 batches, then WO-position deliveries of 1-2 units. */
+/** Sequenced Class A components: receipts in 12-24 batches, then production-sequence position deliveries of 1-2 units. */
 function buildSequencedClassAStory(row, h) {
   const onHand = Math.max(0, Math.floor(Number(row.onHand) || 0));
   if (onHand === 0) return [];
@@ -263,7 +263,7 @@ function buildSequencedClassAStory(row, h) {
   });
 
   del.forEach((qty, didx) => {
-    const wo = row.drivesFG === 'FG-V900-HD' ? 'WO-4422' : 'WO-4421';
+    const wo = row.drivesFG === 'FG-V900-HD' ? 'SEQ-4422' : 'SEQ-4421';
     const reason =
       /WHL/i.test(row.sku)
         ? `Sequenced delivery ${wo} — Position ${Math.min(6, didx + 1)} of 6 axles`
@@ -312,7 +312,7 @@ function buildCmpWhlDrvCrisisStory(description) {
     'Received from Supplier — Detroit Wheel Systems — PO-2026-0031 — 24 units to Receiving Dock',
     'S. Patel'
   );
-  push('2026-04-25T14:00:00.000Z', 'Sequenced Delivery', -8, 'Sequenced delivery WO-4418 complete — 8 units', 'J. Martinez');
+  push('2026-04-25T14:00:00.000Z', 'Sequenced Delivery', -8, 'Sequenced delivery SEQ-4418 complete — 8 units', 'J. Martinez');
   push(
     '2026-04-28T09:00:00.000Z',
     'Planning Alert',
@@ -321,7 +321,7 @@ function buildCmpWhlDrvCrisisStory(description) {
     'R. Chen',
     true
   );
-  push('2026-04-30T11:00:00.000Z', 'Sequenced Delivery', -6, 'Sequenced delivery WO-4419 complete — 6 units', 'J. Martinez');
+  push('2026-04-30T11:00:00.000Z', 'Sequenced Delivery', -6, 'Sequenced delivery SEQ-4419 complete — 6 units', 'J. Martinez');
   push(
     '2026-05-02T15:30:00.000Z',
     'Received from Supplier',
@@ -330,9 +330,9 @@ function buildCmpWhlDrvCrisisStory(description) {
     'S. Patel',
     true
   );
-  push('2026-05-03T06:45:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery WO-4421 — Unit 1 — 2 units', 'J. Martinez');
-  push('2026-05-03T14:15:00.000Z', 'Sequenced Delivery', -4, 'Sequenced delivery WO-4421 — Units 2 and 3 — 4 units', 'J. Martinez');
-  push('2026-05-04T08:30:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery WO-4421 — Unit 4 of 6 axles — 2 units', 'J. Martinez');
+  push('2026-05-03T06:45:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery SEQ-4421 — Unit 1 — 2 units', 'J. Martinez');
+  push('2026-05-03T14:15:00.000Z', 'Sequenced Delivery', -4, 'Sequenced delivery SEQ-4421 — Units 2 and 3 — 4 units', 'J. Martinez');
+  push('2026-05-04T08:30:00.000Z', 'Sequenced Delivery', -2, 'Sequenced delivery SEQ-4421 — Unit 4 of 6 axles — 2 units', 'J. Martinez');
   push(
     '2026-05-04T10:14:00.000Z',
     'Operator Request',
