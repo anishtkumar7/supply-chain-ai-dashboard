@@ -55,7 +55,13 @@ function invChildrenForKeys(keys) {
   return keys
     .map((k) => {
       const id =
-        k === 'fg' ? inventoryNavIds.fg : k === 'components' ? inventoryNavIds.components : inventoryNavIds.parts;
+        k === 'fg'
+          ? inventoryNavIds.fg
+          : k === 'components'
+            ? inventoryNavIds.components
+            : k === 'partLocations'
+              ? inventoryNavIds.partLocations
+              : inventoryNavIds.parts;
       return inventoryNavGroup.children.find((c) => c.id === id);
     })
     .filter(Boolean);
@@ -76,7 +82,7 @@ export const ROLES = {
       { type: 'item', id: 'orderbank' },
       { type: 'item', id: 'customer-orders' },
       { type: 'item', id: PRODUCTION_PLANNING_ID },
-      { type: 'inventory', keys: ['fg', 'components', 'parts'] },
+      { type: 'inventory', keys: ['fg', 'components', 'parts', 'partLocations'] },
       { type: 'item', id: 'suppliers' },
       { type: 'item', id: 'trade-risk' },
       { type: 'fulfillment-group', parentId: 'fulfillment', children: [RECEIVING_ID, SHOP_FLOOR_ID] },
@@ -96,6 +102,7 @@ export const ROLES = {
       { type: 'item', id: ATTENTION_QUEUE_ID },
       { type: 'item', id: AGENTIC_PLAYBOOK_ID },
       { type: 'item', id: inventoryNavIds.parts },
+      { type: 'item', id: inventoryNavIds.partLocations },
       { type: 'inventory', keys: ['components'] },
       { type: 'item', id: PRODUCTION_PLANNING_ID },
       { type: 'item', id: SHOP_FLOOR_ID },
@@ -146,6 +153,7 @@ export const ROLES = {
     segments: [
       { type: 'fulfillment-group', parentId: 'fulfillment', children: [RECEIVING_ID] },
       { type: 'item', id: inventoryNavIds.parts },
+      { type: 'item', id: inventoryNavIds.partLocations },
       { type: 'inventory', keys: ['fg'] },
       { type: 'item', id: 'agents' },
       { type: 'item', id: CONTACTS_ID },
@@ -181,6 +189,7 @@ export const ROLES = {
     label: 'Shop Floor Supervisor',
     segments: [
       { type: 'item', id: inventoryNavIds.parts },
+      { type: 'item', id: inventoryNavIds.partLocations },
       { type: 'inventory', keys: ['fg'] },
       { type: 'item', id: PRODUCTION_PLANNING_ID },
       { type: 'item', id: SHOP_FLOOR_ID },

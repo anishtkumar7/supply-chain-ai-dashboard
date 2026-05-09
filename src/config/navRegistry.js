@@ -18,6 +18,7 @@ export const inventoryNavIds = {
   fg: 'inventory-fg',
   components: 'inventory-components',
   parts: 'inventory-parts',
+  partLocations: 'inventory-part-locations',
 };
 
 export const inventoryNavGroup = {
@@ -27,5 +28,6 @@ export const inventoryNavGroup = {
     { id: inventoryNavIds.fg, label: 'Finished Goods', shortLabel: 'FG' },
     { id: inventoryNavIds.components, label: 'Components (Class A)', shortLabel: 'Class A' },
     { id: inventoryNavIds.parts, label: 'Parts Inventory', shortLabel: 'Parts' },
+    { id: inventoryNavIds.partLocations, label: 'Part Locations', shortLabel: 'Loc' },
   ],
 };

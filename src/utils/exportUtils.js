@@ -59,6 +59,7 @@ export const EXPORT_MODULE_SLUGS = {
   'inventory-fg': 'FinishedGoods',
   'inventory-components': 'ComponentsClassA',
   'inventory-parts': 'PartsInventory',
+  'inventory-part-locations': 'PartLocations',
   suppliers: 'SupplierTracking',
   'trade-risk': 'TradeRisk',
   fulfillment: 'FulfillmentMonitoring',

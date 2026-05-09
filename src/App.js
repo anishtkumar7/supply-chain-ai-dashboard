@@ -14,6 +14,7 @@ import { CustomerOrdersModule } from './modules/CustomerOrdersModule';
 import { TradeRiskModule } from './modules/TradeRiskModule';
 import { DataSyncModule } from './modules/DataSyncModule';
 import { PartsInventoryModule } from './modules/PartsInventoryModule';
+import { PartLocationsModule } from './modules/PartLocationsModule';
 import { ProductionPlanningModule } from './modules/ProductionPlanningModule';
 import { PurchaseOrdersModule } from './modules/PurchaseOrdersModule';
 import { ContactsModule } from './modules/ContactsModule';
@@ -77,6 +78,7 @@ function activeToModuleId(active) {
   if (active === inventoryNavIds.fg) return 'inventory-fg';
   if (active === inventoryNavIds.components) return 'inventory-components';
   if (active === inventoryNavIds.parts) return 'inventory-parts';
+  if (active === inventoryNavIds.partLocations) return 'inventory-part-locations';
   if (active === PRODUCTION_PLANNING_ID) return 'production-planning';
   if (active === PURCHASE_ORDERS_ID) return 'purchase-orders';
   if (active === CONTACTS_ID) return 'contacts';
@@ -797,7 +799,12 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
     for (const seg of segments) {
       if (seg.type === 'item') {
         allowedIds.add(seg.id);
-        if (seg.id === inventoryNavIds.fg || seg.id === inventoryNavIds.components || seg.id === inventoryNavIds.parts) {
+        if (
+          seg.id === inventoryNavIds.fg ||
+          seg.id === inventoryNavIds.components ||
+          seg.id === inventoryNavIds.parts ||
+          seg.id === inventoryNavIds.partLocations
+        ) {
           inventoryChildren.add(seg.id);
         }
       } else if (seg.type === 'inventory') {
@@ -860,6 +867,7 @@ function DashboardApp({ name, roleId, onSwitchRole }) {
         />
       );
     }
+    if (active === inventoryNavIds.partLocations) return () => <PartLocationsModule />;
     const Comp = views[active];
     return Comp ? () => <Comp /> : () => <InventoryModule variant="fg" />;
   }, [active, navigateFromAttention, openCompose, displayName, roleId, pushNotification]);

@@ -13,6 +13,7 @@ export const SC_UI_DENSITY_KEY = 'sc-ui-density';
 export const SC_PLANNER_ESCALATIONS_KEY = 'sc-planner-escalations';
 export const RIVIT_MY_WORK_STATION_STATE_KEY = 'rivit_my_work_station_state';
 export const RIVIT_MC_REPLENISHMENT_QUEUE_KEY = 'rivit_mc_replenishment_queue';
+export const RIVIT_PART_LOCATIONS_STATE_KEY = 'rivit_part_locations_state';
 
 /** All keys removed when resetting demo state between sessions */
 export const DEMO_RESET_STORAGE_KEYS = [
@@ -26,6 +27,7 @@ export const DEMO_RESET_STORAGE_KEYS = [
   SC_PLANNER_ESCALATIONS_KEY,
   RIVIT_MY_WORK_STATION_STATE_KEY,
   RIVIT_MC_REPLENISHMENT_QUEUE_KEY,
+  RIVIT_PART_LOCATIONS_STATE_KEY,
 ];
 
 export function clearDemoLocalStorage() {

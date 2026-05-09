@@ -89,6 +89,7 @@ export const MODULE_IDS = {
   inventoryFg: 'inventory-fg',
   inventoryComponents: 'inventory-components',
   inventoryParts: 'inventory-parts',
+  inventoryPartLocations: 'inventory-part-locations',
   suppliers: 'suppliers',
   tradeRisk: 'trade-risk',
   fulfillment: 'fulfillment',
